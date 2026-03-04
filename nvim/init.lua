@@ -41,7 +41,6 @@ What is Kickstart?
     - (or HTML version): https://neovim.io/doc/user/lua-guide.html
 
 Kickstart Guide:
-
   TODO: The very first thing you should do is to run the command `:Tutor` in Neovim.
 
     If you don't know what this means, type the following:
@@ -146,15 +145,13 @@ vim.o.splitbelow = true
 --   and `:help lua-guide-options`
 vim.o.list = true
 vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣' }
-
+vim.o.relativenumber = true
+vim.opt.scrolloff = 999
 -- Preview substitutions live, as you type!
 vim.o.inccommand = 'split'
 
 -- Show which line your cursor is on
 vim.o.cursorline = true
-
--- Minimal number of screen lines to keep above and below the cursor.
-vim.o.scrolloff = 10
 
 -- if performing an operation that would fail due to unsaved changes in the buffer (like `:q`),
 -- instead raise a dialog asking if you wish to save the current file(s)
@@ -223,12 +220,15 @@ vim.keymap.set({ 'n', 'x', 'o' }, 'E', '{', { remap = true, silent = true })
 
 -- W to back
 vim.keymap.set({ 'n', 'x', 'o' }, 'W', 'b')
+vim.keymap.set('n', 'H', '<cmd>bprevious<cr>', { desc = 'Buffer: previous' })
+vim.keymap.set('n', 'L', '<cmd>bnext<cr>', { desc = 'Buffer: next' })
 
 -- Shift+S to save
 vim.keymap.set({ 'n', 'x' }, 'S', '<cmd>write<cr>', { silent = true, desc = 'Save file' })
 
 -- Shift+M: close all buffers AND exit Neovim
 vim.keymap.set('n', 'M', function() vim.cmd 'q' end, { silent = true, desc = 'Quit Neovim' })
+vim.keymap.set('n', '<leader>d', '<cmd>bdelete<cr>', { desc = 'Buffer: delete' })
 
 -- NOTE: Some terminals have colliding keymaps or are not able to send distinct keycodes
 -- vim.keymap.set("n", "<C-S-h>", "<C-w>H", { desc = "Move window to the left" })
@@ -676,33 +676,107 @@ require('lazy').setup({
     end,
   },
   {
+    'akinsho/bufferline.nvim',
+    version = '*',
+    dependencies = { 'nvim-tree/nvim-web-devicons' },
+    opts = {
+      options = {
+        mode = 'buffers', -- show buffers (not tabs)
+        diagnostics = 'nvim_lsp',
+        separator_style = 'slant',
+        show_buffer_close_icons = false,
+        show_close_icon = false,
+        always_show_bufferline = true,
+      },
+    },
+  },
+  {
     'github/copilot.vim',
     cmd = 'Copilot',
     event = 'InsertEnter',
-    config = function()
+    init = function()
       -- Don't let Copilot map <Tab> by default (avoids conflicts)
       vim.g.copilot_no_tab_map = true
-
-      -- Accept suggestion with <Leader><Tab> in insert mode
-      vim.keymap.set('i', '<Leader><Tab>', 'copilot#Accept("<CR>")', {
+    end,
+    keys = {
+      {
+        '<leader><tab>',
+        'copilot#Accept("<CR>")',
+        mode = 'i',
         expr = true,
         replace_keycodes = false,
         silent = true,
-      })
-
-      -- Toggle Copilot for the current buffer with <Leader>c
-      vim.keymap.set('n', '<leader>c', function()
-        if vim.b.copilot_enabled == 0 then
-          vim.cmd 'Copilot enable'
-          vim.b.copilot_enabled = 1
-        else
-          vim.cmd 'Copilot disable'
-          vim.b.copilot_enabled = 0
-        end
-      end, { desc = 'Toggle Copilot' })
-    end,
+        desc = 'Copilot: accept suggestion',
+      },
+      {
+        '<leader>c',
+        function()
+          -- If unset, treat as enabled; adjust if you prefer default disabled.
+          if vim.b.copilot_enabled == 0 then
+            vim.cmd 'Copilot enable'
+            vim.b.copilot_enabled = 1
+          else
+            vim.cmd 'Copilot disable'
+            vim.b.copilot_enabled = 0
+          end
+        end,
+        mode = 'n',
+        desc = 'Copilot: toggle (buffer)',
+      },
+    },
   },
+  {
+    'nvim-neo-tree/neo-tree.nvim',
+    branch = 'v3.x',
+    cmd = 'Neotree',
+    keys = {
+      { '<leader>e', '<cmd>Neotree toggle<cr>', desc = 'Neo-tree: toggle' },
+    },
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'MunifTanjim/nui.nvim',
+      'nvim-tree/nvim-web-devicons',
+    },
+    opts = {
+      filesystem = {
+        follow_current_file = { enabled = true },
 
+        -- (Optional) keep neo-tree open after opening a file
+        -- If you like the tree to stay visible, set this:
+        -- hijack_netrw_behavior = "open_current", -- not required, just FYI
+
+        window = {
+          mappings = {
+            -- "edit" opens the file in the target window without replacing other windows
+            -- and keeps your previous buffers available (you can :bnext / :buffer / etc).
+            ['<cr>'] = 'open',
+            ['o'] = 'open',
+
+            -- If you specifically want "open without closing tree"
+            ['l'] = 'open',
+
+            -- You can also add split/vsplit opens:
+            ['s'] = 'open_split',
+            ['v'] = 'open_vsplit',
+
+            ['<space>'] = 'none',
+            ['<tab>'] = 'focus_preview',
+            ['n'] = 'next',
+            ['e'] = 'prev',
+          },
+        },
+      },
+
+      window = {
+        mappings = {
+          ['<space>'] = 'none',
+          ['<tab>'] = 'focus_preview',
+          ['n'] = 'next',
+          ['e'] = 'prev',
+        },
+      },
+    },
+  },
   { -- Autoformat
     'stevearc/conform.nvim',
     event = { 'BufWritePre' },
@@ -847,7 +921,6 @@ require('lazy').setup({
           comments = { italic = false }, -- Disable italics in comments
         },
       }
-
       -- Load the colorscheme here.
       -- Like many other themes, this one has different styles, and you could load
       -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
