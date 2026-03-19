@@ -1,4 +1,3 @@
-# Run only in interactive shells
 status is-interactive; or exit
 
 fish_vi_key_bindings
@@ -21,9 +20,9 @@ set -gx GPG_TTY (tty)
 set -gx PYTHON_KEYRING_BACKEND keyring.backends.null.Keyring
 set -gx PYTHONSTARTUP "$HOME/.config/python/pythonrc"
 set -gx R_LIBS_USER "$HOME/.rlibrary/library"
-set -gx FZF_DEFAULT_OPTS "--bind='j:down,k:up' --bind='start:unbind(i,a,j,k)' --bind='esc:disable-search+rebind(i,a,j,k)' --bind='i:enable-search+unbind(i,a,j,k)' --bind='a:enable-search+unbind(i,a,j,k)'"
 
 zoxide init fish | source
+cd ~
 alias c 'z'
 
 if test -x /home/linuxbrew/.linuxbrew/bin/brew
@@ -203,3 +202,6 @@ set -g fish_color_normal normal
 # Optional: other bits
 set -g fish_color_quote yellow
 set -g fish_color_error brred
+set -gx LD_LIBRARY_PATH /opt/oracle/instantclient_23_26 $LD_LIBRARY_PATH
+set -gx PATH /opt/oracle/instantclient_23_26 $PATH
+set -gx TNS_ADMIN /opt/oracle/instantclient_23_26/network/admin
