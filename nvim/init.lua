@@ -18,7 +18,6 @@
 ========                                                     ========
 =====================================================================
 =====================================================================
-
 What is Kickstart?
 
   Kickstart.nvim is *not* a distribution.
@@ -443,8 +442,10 @@ require('lazy').setup({
       require('diffview').setup {
         keymaps = {
           view = {
-            ['n'] = actions.select_next_entry,
-            ['e'] = actions.select_prev_entry,
+            { 'n', 'n', 'j', { desc = 'Move cursor down' } },
+            { 'n', 'e', 'k', { desc = 'Move cursor up' } },
+            ['N'] = actions.select_next_entry,
+            ['E'] = actions.select_prev_entry,
           },
           file_panel = {
             ['n'] = actions.next_entry,
