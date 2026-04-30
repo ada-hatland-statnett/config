@@ -35,29 +35,53 @@ alias s 'nvim main.tex'
 alias l 'eza --icons --time-style=long-iso --ignore-glob="__pycache__"'
 alias ls 'eza --icons --time-style=long-iso -a'
 
-# cd wrapper: auto venv + list
+
 functions -e cd 2>/dev/null
 function cd --wraps=cd
+    set -l previous_pwd $PWD
+
+    # cd / cd - / cd <path>
     if test (count $argv) -eq 0
         builtin cd ~; or return
+    else if test "$argv[1]" = "-"
+        if set -q OLDPWD
+            builtin cd $OLDPWD; or return
+        else
+            echo "cd: OLDPWD not set"
+            return 1
+        end
     else
         builtin cd $argv; or return
     end
 
-    if not set -q VIRTUAL_ENV
-        if test -f .venv/bin/activate.fish
-            source .venv/bin/activate.fish
+    # maintain OLDPWD like other shells
+    set -gx OLDPWD $previous_pwd
+
+    # git roots (empty if not in repo)
+    set -l old_git_root (git -C "$previous_pwd" rev-parse --show-toplevel 2>/dev/null)
+    set -l new_git_root (git -C "$PWD"          rev-parse --show-toplevel 2>/dev/null)
+
+    if set -q VIRTUAL_ENV
+        set -l venv_parent (path dirname "$VIRTUAL_ENV")
+
+        # Keep venv if:
+        # 1) still under its parent, OR
+        # 2) moved within same git repo
+        if not string match -q -- "$venv_parent*" "$PWD"
+            if test -z "$old_git_root" -o -z "$new_git_root" -o "$old_git_root" != "$new_git_root"
+                functions -q deactivate; and deactivate
+            end
         end
     else
-        set -l venv_parent (path dirname "$VIRTUAL_ENV")
-        # Simpler and robust: prefix check, no regex needed
-        if not string match -q -- "$venv_parent*" "$PWD"
-            functions -q deactivate; and deactivate
+        # auto-activate local .venv
+        if test -f .venv/bin/activate.fish
+            source .venv/bin/activate.fish
         end
     end
 
     l
 end
+
 # ---------- Aliases ----------
 alias mosh 'mosh --no-init'
 alias tree 'tree -L 3 -C'
@@ -69,6 +93,8 @@ alias cal 'cal -m'
 
 # git aliases
 alias gs 'git status'
+alias gsw 'git switch'
+alias gm 'git switch main'
 alias gc 'git commit -m'
 alias ga 'git add'
 alias gp 'git push'
@@ -108,9 +134,47 @@ function act --description "Activate repo-root .venv if present"
     end
 end
 
-function zfunc --description "zoxide jump + activate + list"
+function zfunc --description "zoxide jump + auto venv + git-aware deactivate + list"
+    set -l previous_pwd $PWD
     z $argv; or return
-    act; and l; or l
+
+    # --- helper: find nearest .venv up the tree ---
+    set -l probe "$PWD"
+    set -l found_activate ""
+    while true
+        if test -f "$probe/.venv/bin/activate.fish"
+            set found_activate "$probe/.venv/bin/activate.fish"
+            break
+        end
+        if test "$probe" = "/"
+            break
+        end
+        set probe (path dirname "$probe")
+    end
+
+    # git roots (empty if not in repo)
+    set -l old_git_root (git -C "$previous_pwd" rev-parse --show-toplevel 2>/dev/null)
+    set -l new_git_root (git -C "$PWD"          rev-parse --show-toplevel 2>/dev/null)
+
+    if set -q VIRTUAL_ENV
+        set -l venv_parent (path dirname "$VIRTUAL_ENV")
+
+        # deactivate only if outside venv tree AND not same git repo
+        if not string match -q -- "$venv_parent*" "$PWD"
+            if test -z "$old_git_root" -o -z "$new_git_root" -o "$old_git_root" != "$new_git_root"
+                functions -q deactivate; and deactivate
+            end
+        end
+    end
+
+    # activate if no venv active after possible deactivation
+    if not set -q VIRTUAL_ENV
+        if test -n "$found_activate"
+            source "$found_activate"
+        end
+    end
+
+    l
 end
 alias f 'zfunc'
 

@@ -171,6 +171,7 @@ vim.api.nvim_set_hl(0, 'pythonInclude', { fg = '#c678dd', bold = true }) -- purp
 -- The module name (e.g. 'os' in 'from os import path')
 vim.api.nvim_set_hl(0, '@module.python', { fg = '#e5c07b' }) -- yellow
 
+vim.api.nvim_set_hl(0, 'pythonComment', { fg = '#a0a0a0' })
 -- Diagnostic Config & Keymaps
 -- See :help vim.diagnostic.Opts
 vim.diagnostic.config {
@@ -236,10 +237,12 @@ vim.keymap.set({ 'n', 'x' }, 'S', '<cmd>write<cr>', { silent = true, desc = 'Sav
 -- Shift+M: close all buffers AND exit Neovim
 vim.keymap.set('n', 'M', function() vim.cmd 'q' end, { silent = true, desc = 'Quit Neovim' })
 vim.keymap.set('n', '<leader>d', '<cmd>bdelete<cr>', { desc = 'Buffer: delete' })
+vim.keymap.set('n', 'U', '<C-r>', { noremap = true, silent = true })
+vim.keymap.set('n', '<leader>sg', ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>")
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
+--
 local _term_bufnr = nil
-
 function run_curr_python_file()
   local file_name = vim.api.nvim_buf_get_name(0)
 
@@ -250,38 +253,48 @@ function run_curr_python_file()
 
   -- If a terminal buffer already exists, close it
   if _term_bufnr and vim.api.nvim_buf_is_valid(_term_bufnr) then
-    -- Get the window displaying the terminal buffer and close it
     for _, win in ipairs(vim.api.nvim_list_wins()) do
       if vim.api.nvim_win_get_buf(win) == _term_bufnr then
         vim.api.nvim_win_close(win, true)
         break
       end
     end
-    -- Force-delete the terminal buffer itself
     vim.api.nvim_buf_delete(_term_bufnr, { force = true })
     _term_bufnr = nil
   end
 
-  -- Open a horizontal split below, 20 lines tall
-  vim.cmd 'below 20new'
+  -- Open a horizontal split below, 20 lines tall (max cap)
+  vim.cmd 'below 5new'
 
   _term_bufnr = vim.api.nvim_get_current_buf()
 
   vim.fn.termopen('python3 ' .. vim.fn.shellescape(file_name), {
     on_exit = function(_, exit_code, _)
-      -- Auto-close the terminal when the process exits with code 0
-      if exit_code == 0 and _term_bufnr and vim.api.nvim_buf_is_valid(_term_bufnr) then
-        vim.schedule(function()
+      vim.schedule(function()
+        -- Resize window to fit output, capped at 20
+        if _term_bufnr and vim.api.nvim_buf_is_valid(_term_bufnr) then
+          local line_count = vim.api.nvim_buf_line_count(_term_bufnr)
+          local new_height = math.min(line_count, 20)
+
           for _, win in ipairs(vim.api.nvim_list_wins()) do
             if vim.api.nvim_win_get_buf(win) == _term_bufnr then
-              vim.api.nvim_win_close(win, true)
+              if exit_code == 0 then
+                -- Close on success
+                vim.api.nvim_win_close(win, true)
+              else
+                -- Resize to fit output on failure
+                vim.api.nvim_win_set_height(win, new_height)
+              end
               break
             end
           end
-          vim.api.nvim_buf_delete(_term_bufnr, { force = true })
-          _term_bufnr = nil
-        end)
-      end
+
+          if exit_code == 0 then
+            vim.api.nvim_buf_delete(_term_bufnr, { force = true })
+            _term_bufnr = nil
+          end
+        end
+      end)
     end,
   })
 
@@ -406,7 +419,58 @@ require('lazy').setup({
   -- you do for a plugin at the top level, you can do for a dependency.
   --
   -- Use the `dependencies` key to specify the dependencies of a particular plugin
+  {
+    'akinsho/git-conflict.nvim',
+    version = '*',
+    config = function()
+      require('git-conflict').setup {
+        default_mappings = {
+          ours = '<leader>co',
+          theirs = '<leader>ct',
+          none = '<leader>c0',
+          both = '<leader>cb',
+          next = '<leader>cn',
+          prev = 'p',
+        },
+      }
+    end,
+  },
+  {
+    'sindrets/diffview.nvim',
+    config = function()
+      local actions = require 'diffview.actions'
 
+      require('diffview').setup {
+        keymaps = {
+          view = {
+            ['n'] = actions.select_next_entry,
+            ['e'] = actions.select_prev_entry,
+          },
+          file_panel = {
+            ['n'] = actions.next_entry,
+            ['e'] = actions.prev_entry,
+          },
+        },
+      }
+
+      -- Keymap for toggling Diffview
+      vim.keymap.set('n', '<leader>g', function()
+        local lib = require 'diffview.lib'
+        local view = lib.get_current_view()
+
+        if view then
+          -- If Diffview is open, close it
+          vim.cmd 'DiffviewClose'
+        else
+          -- If Diffview is closed, open it with DiffviewOpen
+          vim.cmd 'DiffviewOpen'
+        end
+      end, { desc = 'Toggle Diffview' })
+    end,
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+    },
+  },
   { -- Fuzzy Finder (files, lsp, etc)
     'nvim-telescope/telescope.nvim',
     -- By default, Telescope is included and acts as your picker for everything.
@@ -422,6 +486,7 @@ require('lazy').setup({
     event = 'VimEnter',
     dependencies = {
       'nvim-lua/plenary.nvim',
+      'nvim-telescope/telescope-live-grep-args.nvim',
       { -- If encountering errors, see telescope-fzf-native README for installation instructions
         'nvim-telescope/telescope-fzf-native.nvim',
 
@@ -438,6 +503,7 @@ require('lazy').setup({
       -- Useful for getting pretty icons, but requires a Nerd Font.
       { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
     },
+
     config = function()
       -- Telescope is a fuzzy finder that comes with a lot of different things that
       -- it can fuzzy find! It's more than just a "file finder", it can search
@@ -472,10 +538,21 @@ require('lazy').setup({
         -- pickers = {}
         extensions = {
           ['ui-select'] = { require('telescope.themes').get_dropdown() },
+          -- Configure live grep args extension
+          live_grep_args = {
+            auto_quoting = true, -- enable/disable auto-quoting for search word
+            mappings = { -- extend default Telescope mappings
+              i = {
+                ['<C-k>'] = require('telescope-live-grep-args.actions').quote_prompt(),
+                ['<C-i>'] = require('telescope-live-grep-args.actions').quote_prompt { postfix = ' --iglob ' },
+              },
+            },
+          },
         },
       }
 
-      -- Enable Telescope extensions if they are installed
+      -- Load Telescope extensions
+      pcall(require('telescope').load_extension 'live_grep_args')
       pcall(require('telescope').load_extension, 'fzf')
       pcall(require('telescope').load_extension, 'ui-select')
 
@@ -486,7 +563,6 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
       vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
       vim.keymap.set({ 'n', 'v' }, '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
-      vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
       vim.keymap.set('n', '<leader>sd', builtin.diagnostics, { desc = '[S]earch [D]iagnostics' })
       vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
       vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
@@ -1078,6 +1154,30 @@ require('lazy').setup({
 
       -- ... and there is more!
       --  Check out: https://github.com/nvim-mini/mini.nvim
+    end,
+  },
+  {
+    'hat0uma/csvview.nvim',
+    -- Plugin options
+    opts = {
+      parser = { comments = { '#', '//' } },
+      keymaps = {
+        textobject_field_inner = { 'if', mode = { 'o', 'x' } },
+        textobject_field_outer = { 'af', mode = { 'o', 'x' } },
+        jump_next_field_end = { '<Tab>', mode = { 'n', 'v' } },
+        jump_prev_field_end = { '<S-Tab>', mode = { 'n', 'v' } },
+        jump_next_row = { '<Enter>', mode = { 'n', 'v' } },
+        jump_prev_row = { '<S-Enter>', mode = { 'n', 'v' } },
+      },
+    },
+    cmd = { 'CsvViewEnable', 'CsvViewDisable', 'CsvViewToggle' },
+
+    -- Use 'init' or 'config' to register the autocmd, NOT directly inside the plugin table.
+    init = function()
+      vim.api.nvim_create_autocmd('FileType', {
+        pattern = 'csv',
+        callback = function() vim.cmd 'CsvViewEnable' end,
+      })
     end,
   },
   { -- Highlight, edit, and navigate code
