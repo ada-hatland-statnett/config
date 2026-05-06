@@ -22,7 +22,6 @@ set -gx PYTHONSTARTUP "$HOME/.config/python/pythonrc"
 set -gx R_LIBS_USER "$HOME/.rlibrary/library"
 
 zoxide init fish | source
-cd ~
 alias c 'z'
 
 if test -x /home/linuxbrew/.linuxbrew/bin/brew
@@ -90,6 +89,7 @@ alias .. 'cd ..'
 alias ... 'cd ../..'
 alias .... 'cd ../../..'
 alias cal 'cal -m'
+alias t 'tmux'
 
 # git aliases
 alias gs 'git status'

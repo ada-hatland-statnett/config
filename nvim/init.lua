@@ -454,19 +454,19 @@ require('lazy').setup({
         },
       }
 
-      -- Keymap for toggling Diffview
-      vim.keymap.set('n', '<leader>g', function()
+      -- Keymaps for toggling Diffview
+      local function toggle_diffview(args)
         local lib = require 'diffview.lib'
         local view = lib.get_current_view()
-
         if view then
-          -- If Diffview is open, close it
           vim.cmd 'DiffviewClose'
         else
-          -- If Diffview is closed, open it with DiffviewOpen
-          vim.cmd 'DiffviewOpen'
+          vim.cmd('DiffviewOpen ' .. (args or ''))
         end
-      end, { desc = 'Toggle Diffview' })
+      end
+
+      vim.keymap.set('n', '<leader>gm', function() toggle_diffview 'main' end, { desc = 'Toggle Diffview (main)' })
+      vim.keymap.set('n', '<leader>gu', function() toggle_diffview() end, { desc = 'Toggle Diffview (unstaged)' })
     end,
     dependencies = {
       'nvim-lua/plenary.nvim',
