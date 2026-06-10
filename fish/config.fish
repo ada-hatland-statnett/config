@@ -33,6 +33,7 @@ alias e 'nvim'
 alias s 'nvim main.tex'
 alias l 'eza --icons --time-style=long-iso --ignore-glob="__pycache__"'
 alias ls 'eza --icons --time-style=long-iso -a'
+alias load 'typer insight/loader.py run --ds'
 
 
 functions -e cd 2>/dev/null

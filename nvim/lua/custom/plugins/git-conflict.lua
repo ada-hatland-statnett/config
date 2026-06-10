@@ -6,12 +6,12 @@ return {
     config = function()
       require('git-conflict').setup {
         default_mappings = {
-          ours = '<leader>ac',
-          theirs = '<leader>ai',
+          ours = '<leader>ao',
+          theirs = '<leader>at',
           both = '<leader>ab',
           none = '<leader>a0',
           next = '<leader>an',
-          prev = 'p',
+          prev = '<leader>ap',
         },
       }
     end,
