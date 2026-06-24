@@ -37,8 +37,7 @@ local function get_conn()
 end
 
 local function conn_cache(conn_id)
-  cache[conn_id] = cache[conn_id]
-    or { structure_items = nil, table_lookup = {}, columns = {}, fetching = {}, structure_fetching = false }
+  cache[conn_id] = cache[conn_id] or { structure_items = nil, table_lookup = {}, columns = {}, fetching = {}, structure_fetching = false }
   return cache[conn_id]
 end
 
@@ -56,7 +55,7 @@ local function ensure_structure(conn, api)
     local items = {}
     for _, schema_node in ipairs(structures) do
       local schema_name = schema_node.name
-      items[#items + 1] = { label = schema_name, kind = Kind.Module, insertText = schema_name, detail = 'schema' }
+      items[#items + 1] = { label = schema_name:lower(), kind = Kind.Module, insertText = schema_name:lower(), detail = 'schema' }
 
       for _, obj in ipairs(schema_node.children or {}) do
         local kind, detail = Kind.Struct, (obj.type or 'table')
@@ -66,11 +65,11 @@ local function ensure_structure(conn, api)
           detail = 'view'
         end
         items[#items + 1] = {
-          label = obj.name,
+          label = obj.name:lower(),
           kind = kind,
-          insertText = obj.name,
-          detail = detail .. ' (' .. schema_name .. ')',
-          labelDetails = { description = schema_name },
+          insertText = obj.name:lower(),
+          detail = detail .. ' (' .. schema_name:lower() .. ')',
+          labelDetails = { description = schema_name:lower() },
         }
         c.table_lookup[obj.name:lower()] = { name = obj.name, schema = schema_name, type = obj.type or 'table' }
       end
@@ -99,11 +98,11 @@ local function ensure_columns(conn, api, tbl_key)
     local items = {}
     for _, col in ipairs(columns) do
       items[#items + 1] = {
-        label = col.name,
+        label = col.name:lower(),
         kind = Kind.Field,
-        insertText = col.name,
-        detail = (col.type or 'column') .. ' (' .. meta.name .. ')',
-        labelDetails = { description = meta.name },
+        insertText = col.name:lower(),
+        detail = (col.type or 'column') .. ' (' .. meta.name:lower() .. ')',
+        labelDetails = { description = meta.name:lower() },
       }
     end
     c.columns[tbl_key] = items
@@ -161,8 +160,12 @@ function dbee_source:get_completions(_, callback)
   }
 end
 
--- Public helper to clear the cache (e.g. after changing connection / schema).
-function dbee_source.clear_cache() cache = {} end
+-- Public helper to clear the table cache and in-memory state.
+-- Does NOT clear the persisted columns file (<leader>L handles that).
+function dbee_source.clear_cache()
+  cache = {}
+  os.remove(TABLES_FILE)
+end
 
 -- Look up the schema for a table name from the cache.
 -- If the cache is empty, synchronously fetches the structure first.
@@ -180,7 +183,7 @@ function dbee_source.get_schema_for_table(table_name)
       local items = {}
       for _, schema_node in ipairs(structures) do
         local schema_name = schema_node.name
-        items[#items + 1] = { label = schema_name, kind = Kind.Module, insertText = schema_name, detail = 'schema' }
+        items[#items + 1] = { label = schema_name:lower(), kind = Kind.Module, insertText = schema_name:lower(), detail = 'schema' }
         for _, obj in ipairs(schema_node.children or {}) do
           local kind, detail = Kind.Struct, (obj.type or 'table')
           local t = (obj.type or ''):lower()
@@ -189,11 +192,11 @@ function dbee_source.get_schema_for_table(table_name)
             detail = 'view'
           end
           items[#items + 1] = {
-            label = obj.name,
+            label = obj.name:lower(),
             kind = kind,
-            insertText = obj.name,
-            detail = detail .. ' (' .. schema_name .. ')',
-            labelDetails = { description = schema_name },
+            insertText = obj.name:lower(),
+            detail = detail .. ' (' .. schema_name:lower() .. ')',
+            labelDetails = { description = schema_name:lower() },
           }
           c.table_lookup[obj.name:lower()] = { name = obj.name, schema = schema_name, type = obj.type or 'table' }
         end
@@ -206,13 +209,38 @@ function dbee_source.get_schema_for_table(table_name)
   return meta and meta.schema or nil
 end
 
--- Return a sorted list of "schema.table" strings for all cached tables.
--- Populates the cache synchronously if empty.
-function dbee_source.list_tables()
+-- Persistence path for the table list (survives reloads).
+local TABLES_FILE = vim.fn.stdpath 'state' .. '/dbee/tables.json'
+
+--- Load the persisted table list from disk.
+--- @return string[]|nil
+local function load_tables_file()
+  local f = io.open(TABLES_FILE, 'r')
+  if not f then return nil end
+  local raw = f:read '*a'
+  f:close()
+  if not raw or raw == '' then return nil end
+  local ok, data = pcall(vim.fn.json_decode, raw)
+  if ok and type(data) == 'table' then return data end
+  return nil
+end
+
+--- Save the table list to disk.
+--- @param tables string[]
+local function save_tables_file(tables)
+  local dir = vim.fn.fnamemodify(TABLES_FILE, ':h')
+  vim.fn.mkdir(dir, 'p')
+  local f = io.open(TABLES_FILE, 'w')
+  if not f then return end
+  f:write(vim.fn.json_encode(tables))
+  f:close()
+end
+
+-- Fetch the table list from the DB and save to disk.
+function dbee_source.fetch_tables()
   local conn, api = get_conn()
   if not conn then return {} end
 
-  -- Ensure cache is populated (reuse get_schema_for_table's logic)
   dbee_source.get_schema_for_table '__force_cache__'
 
   local c = cache[conn.id]
@@ -223,7 +251,102 @@ function dbee_source.list_tables()
     results[#results + 1] = meta.schema .. '.' .. meta.name
   end
   table.sort(results)
+  save_tables_file(results)
   return results
+end
+
+-- Return a sorted list of "schema.table" strings.
+-- If `force` is true, always re-fetches from the DB.
+-- Otherwise, uses the persisted file if it exists.
+function dbee_source.list_tables(force)
+  if not force then
+    local from_file = load_tables_file()
+    if from_file and #from_file > 0 then return from_file end
+  end
+
+  return dbee_source.fetch_tables()
+end
+
+-- Persistence path for the column index (survives reloads).
+local COLUMNS_FILE = vim.fn.stdpath 'state' .. '/dbee/columns.json'
+
+--- Load the persisted column index from disk.
+--- @return { column: string, schema: string, table: string }[]|nil
+local function load_columns_file()
+  local f = io.open(COLUMNS_FILE, 'r')
+  if not f then return nil end
+  local raw = f:read '*a'
+  f:close()
+  if not raw or raw == '' then return nil end
+  local ok, data = pcall(vim.fn.json_decode, raw)
+  if ok and type(data) == 'table' then return data end
+  return nil
+end
+
+--- Save the column index to disk.
+--- @param entries { column: string, schema: string, table: string }[]
+local function save_columns_file(entries)
+  local dir = vim.fn.fnamemodify(COLUMNS_FILE, ':h')
+  vim.fn.mkdir(dir, 'p')
+  local f = io.open(COLUMNS_FILE, 'w')
+  if not f then return end
+  f:write(vim.fn.json_encode(entries))
+  f:close()
+end
+
+-- Build a flat index of every column across all tables by querying the DB.
+-- Saves the result to disk for persistence.
+-- Returns a list of entries: { column = string, schema = string, table = string }
+function dbee_source.fetch_all_columns()
+  local conn, api = get_conn()
+  if not conn then return {} end
+
+  -- ensure table_lookup is populated
+  dbee_source.get_schema_for_table '__force_cache__'
+
+  local c = cache[conn.id]
+  if not c or not c.table_lookup then return {} end
+
+  c.column_names = c.column_names or {}
+
+  local entries = {}
+  for tbl_key, meta in pairs(c.table_lookup) do
+    local ok, columns = pcall(api.connection_get_columns, conn.id, {
+      table = meta.name,
+      schema = meta.schema,
+      materialization = meta.type,
+    })
+    local names = {}
+    if ok and columns then
+      for _, col in ipairs(columns) do
+        names[#names + 1] = col.name
+      end
+    end
+    c.column_names[tbl_key] = names
+    for _, col in ipairs(names) do
+      entries[#entries + 1] = { column = col, schema = meta.schema, table = meta.name }
+    end
+  end
+
+  table.sort(entries, function(a, b)
+    if a.column:lower() == b.column:lower() then return a.table:lower() < b.table:lower() end
+    return a.column:lower() < b.column:lower()
+  end)
+
+  save_columns_file(entries)
+  return entries
+end
+
+-- Return the column index. If `force` is true, always re-fetch from the DB.
+-- Otherwise, try the persisted file first, then in-memory cache, then fetch.
+function dbee_source.list_all_columns(force)
+  if not force then
+    -- try persisted file
+    local from_file = load_columns_file()
+    if from_file and #from_file > 0 then return from_file end
+  end
+
+  return dbee_source.fetch_all_columns()
 end
 
 return dbee_source
