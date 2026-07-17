@@ -4,6 +4,24 @@ return {
     'sindrets/diffview.nvim',
     config = function()
       local actions = require 'diffview.actions'
+
+      -- Close Diffview and open the real file under the cursor in the file panel.
+      local function open_file_under_cursor()
+        local lib = require 'diffview.lib'
+        local view = lib.get_current_view()
+        if not (view and view.panel) then return end
+
+        local item = view.panel:get_item_at_cursor()
+        if not (item and item.absolute_path) then
+          vim.notify('No file under cursor', vim.log.levels.WARN)
+          return
+        end
+
+        local path = item.absolute_path
+        vim.cmd 'DiffviewClose'
+        vim.cmd('edit ' .. vim.fn.fnameescape(path))
+      end
+
       require('diffview').setup {
         keymaps = {
           view = {
@@ -15,6 +33,7 @@ return {
           file_panel = {
             ['n'] = actions.next_entry,
             ['e'] = actions.prev_entry,
+            { 'n', 'o', open_file_under_cursor, { desc = 'Close Diffview and open file in buffer' } },
           },
         },
       }

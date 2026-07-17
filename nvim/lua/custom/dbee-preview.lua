@@ -17,17 +17,76 @@ local PAGE = 50
 -- { schema = string, table = string, where = string|nil, offset = integer }
 local last_preview = nil
 
+--- Build the preview query string from the current `last_preview` state.
+--- @param fetch_count integer  number of rows to fetch
+--- @return string
+local function build_query(fetch_count)
+  local p = last_preview
+  local query = 'SELECT * FROM ' .. p.schema .. '.' .. p.table
+  if p.where and p.where ~= '' then query = query .. ' WHERE ' .. p.where end
+  query = query .. ' ORDER BY 1'
+  query = query .. ' OFFSET ' .. p.offset .. ' ROWS FETCH NEXT ' .. fetch_count .. ' ROWS ONLY'
+  return query
+end
+
+-- Whether we've registered the persistent retry listener.
+local retry_listener_registered = false
+-- State for the current retry-aware execution.
+local pending_retry = nil -- { call_id, schema, table }
+
+--- Register a one-time listener (persistent, but guarded) that retries with
+--- FETCH NEXT 1 when the preview query fails.
+local function ensure_retry_listener()
+  if retry_listener_registered then return end
+  retry_listener_registered = true
+
+  local core = require 'dbee.api.core'
+  core.register_event_listener('call_state_changed', function(data)
+    local call = data and data.call
+    if not call or not pending_retry then return end
+    if call.id ~= pending_retry.call_id then return end
+
+    if call.state == 'executing_failed' or call.state == 'retrieving_failed' then
+      pending_retry = nil
+      -- Retry with a single row to confirm the table is accessible at all.
+      vim.schedule(function()
+        if not last_preview then return end
+        local fallback_query = build_query(1)
+        vim.notify('Preview failed, retrying with 1 row...', vim.log.levels.WARN)
+        require('dbee').execute(fallback_query)
+      end)
+    elseif call.state == 'archived' or call.state == 'retrieving' then
+      -- success, clear pending
+      pending_retry = nil
+    end
+  end)
+end
+
 --- Build and run the preview query from the current `last_preview` state.
 local function run_current()
   local p = last_preview
   if not p then return end
 
-  local query = 'SELECT * FROM ' .. p.schema .. '.' .. p.table
-  if p.where and p.where ~= '' then query = query .. ' WHERE ' .. p.where end
-  -- Deterministic order is required for stable OFFSET paging in Oracle.
-  query = query .. ' ORDER BY 1'
-  query = query .. ' OFFSET ' .. p.offset .. ' ROWS FETCH NEXT ' .. PAGE .. ' ROWS ONLY'
-  require('dbee').execute(query)
+  local core = require 'dbee.api.core'
+  local conn = core.get_current_connection()
+  if not conn then
+    require('dbee').execute(build_query(PAGE))
+    return
+  end
+
+  ensure_retry_listener()
+
+  local query = build_query(PAGE)
+  -- Execute via the core API so we get the call id for retry detection,
+  -- then hand it to the UI + open dbee.
+  local ui = require 'dbee.api.ui'
+  local call = core.connection_execute(conn.id, query)
+  ui.result_set_call(call)
+  require('dbee').open()
+
+  if call and call.id then
+    pending_retry = { call_id = call.id }
+  end
 end
 
 --- Start a fresh preview of schema.table (offset 0, no filter).

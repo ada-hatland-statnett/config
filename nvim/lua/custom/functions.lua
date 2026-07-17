@@ -42,6 +42,8 @@ function M.run_curr_python_file()
                 vim.api.nvim_win_close(win, true)
               else
                 vim.api.nvim_win_set_height(win, new_height)
+                -- Scroll to bottom so the exception is immediately visible
+                vim.api.nvim_win_set_cursor(win, { line_count, 0 })
               end
               break
             end

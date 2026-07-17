@@ -15,8 +15,9 @@ local TERM_FAIL = { executing_failed = true, retrieving_failed = true, archive_f
 local TERM_OK = { archived = true }
 
 -- Safety net: if no terminal event arrives within this window, give up so the
--- runner can never get permanently stuck.
-local STATEMENT_TIMEOUT_MS = 120000
+-- runner can never get permanently stuck. Set high so long-running queries are
+-- never aborted; this only recovers from a genuinely stuck state.
+local STATEMENT_TIMEOUT_MS = 3600000 -- 1 hour
 
 --------------------------------------------------------------------------------
 -- Statement splitting (semicolon-aware; ignores ; in '...' strings and -- comments)
