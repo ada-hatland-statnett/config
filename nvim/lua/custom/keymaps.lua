@@ -45,6 +45,7 @@ vim.keymap.set('n', '<leader>sg', function()
   local actions = require 'telescope.actions'
   local action_state = require 'telescope.actions.state'
   require('telescope').extensions.live_grep_args.live_grep_args {
+    additional_args = function() return { '--hidden', '--glob', '!**/.*/**' } end,
     attach_mappings = function(prompt_bufnr)
       actions.select_default:replace(function()
         local entry = action_state.get_selected_entry()
@@ -53,9 +54,7 @@ vim.keymap.set('n', '<leader>sg', function()
         local filename = vim.fn.fnameescape(entry.filename)
         if entry.lnum then
           vim.cmd(('edit +%d %s'):format(entry.lnum, filename))
-          if entry.col and entry.col > 1 then
-            vim.api.nvim_win_set_cursor(0, { entry.lnum, entry.col - 1 })
-          end
+          if entry.col and entry.col > 1 then vim.api.nvim_win_set_cursor(0, { entry.lnum, entry.col - 1 }) end
           vim.cmd 'normal! zz'
         else
           vim.cmd('edit ' .. filename)

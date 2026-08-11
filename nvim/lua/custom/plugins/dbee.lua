@@ -33,7 +33,7 @@ return {
       })
     end,
     keys = {
-      { '<leader>p', function() require('dbee').toggle() end, desc = 'Database UI toggle' },
+      { '<leader>D', function() require('dbee').toggle() end, desc = 'Database UI toggle' },
       {
         '<leader>r',
         function() require('custom.dbee-runner').run_buffer() end,
