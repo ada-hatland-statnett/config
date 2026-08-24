@@ -52,12 +52,16 @@ vim.keymap.set('n', '<leader>sg', function()
         actions.close(prompt_bufnr)
         if not entry then return end
         local filename = vim.fn.fnameescape(entry.filename)
+        vim.cmd('edit ' .. filename)
         if entry.lnum then
-          vim.cmd(('edit +%d %s'):format(entry.lnum, filename))
-          if entry.col and entry.col > 1 then vim.api.nvim_win_set_cursor(0, { entry.lnum, entry.col - 1 }) end
-          vim.cmd 'normal! zz'
-        else
-          vim.cmd('edit ' .. filename)
+          local col = (entry.col and entry.col > 1) and (entry.col - 1) or 0
+          vim.schedule(function()
+            local win = vim.api.nvim_get_current_win()
+            local line_count = vim.api.nvim_buf_line_count(0)
+            local lnum = math.min(entry.lnum, line_count)
+            vim.api.nvim_win_set_cursor(win, { lnum, col })
+            vim.cmd 'normal! zz'
+          end)
         end
       end)
       return true

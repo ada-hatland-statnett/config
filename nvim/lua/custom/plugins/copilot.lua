@@ -26,9 +26,11 @@ return {
           if vim.b.copilot_enabled == 0 then
             vim.cmd 'Copilot enable'
             vim.b.copilot_enabled = 1
+            vim.notify('Copilot enabled', vim.log.levels.INFO)
           else
             vim.cmd 'Copilot disable'
             vim.b.copilot_enabled = 0
+            vim.notify('Copilot disabled', vim.log.levels.INFO)
           end
         end,
         mode = { 'n', 'i', 'v', 'x', 't' },
@@ -39,15 +41,15 @@ return {
         function()
           vim.cmd 'Copilot enable'
           vim.g.copilot_enabled = 1
-          vim.notify('Copilot enabled for 5 minutes', vim.log.levels.INFO)
+          vim.notify('Copilot enabled for 1 minute', vim.log.levels.INFO)
           vim.defer_fn(function()
             vim.cmd 'Copilot disable'
             vim.g.copilot_enabled = 0
-            vim.notify('Copilot disabled (5 min elapsed)', vim.log.levels.INFO)
-          end, 5 * 60 * 1000)
+            vim.notify('Copilot disabled (1 min elapsed)', vim.log.levels.INFO)
+          end, 60 * 1000)
         end,
         mode = 'n',
-        desc = 'Copilot: enable for 5 minutes',
+        desc = 'Copilot: enable for 1 minute',
       },
     },
   },

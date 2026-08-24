@@ -11,3 +11,6 @@ z.sh
 matplotlib
 homebrew
 google-chrome-for-testing
+.semgrep
+pgcli
+mise

@@ -33,7 +33,7 @@ alias e 'nvim'
 alias s 'nvim main.tex'
 alias l 'eza --icons --time-style=long-iso --ignore-glob="__pycache__"'
 alias ls 'eza --icons --time-style=long-iso -a'
-alias load 'typer insight/loader.py run --ds'
+alias load '.venv/bin/typer insight/loader.py run --ds'
 
 
 functions -e cd 2>/dev/null
@@ -103,6 +103,7 @@ alias gb 'git branch'
 alias gd 'git diff'
 alias gr 'git restore'
 alias gpl 'git pull'
+alias gd 'git branch -d'
 
 alias m 'make'
 alias mc 'make clean'

@@ -19,6 +19,7 @@ return {
         follow_current_file = { enabled = true },
         filtered_items = { hide_gitignored = false },
         window = {
+          width = 70,
           mappings = {
             ['<cr>'] = 'open',
             ['o'] = 'open',
