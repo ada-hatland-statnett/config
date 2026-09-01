@@ -29,11 +29,29 @@ return {
         lua = { 'stylua' },
         python = { 'ruff_format', 'ruff_organize_imports' },
         sql = { 'sqlfluff' },
+        yaml = { 'prettier' },
       },
       formatters = {
+        -- Max line width 80 for every formatter below.
+        stylua = {
+          prepend_args = { '--column-width', '80' },
+        },
+        ruff_format = {
+          prepend_args = { '--line-length', '80' },
+        },
+        prettier = {
+          prepend_args = { '--print-width', '80' },
+        },
         sqlfluff = {
           command = 'sqlfluff',
-          args = { 'format', '--dialect', 'oracle', '-' },
+          args = {
+            'format',
+            '--dialect',
+            'oracle',
+            '--config',
+            vim.fn.stdpath 'config' .. '/.sqlfluff',
+            '-',
+          },
           stdin = true,
           cwd = function() return vim.fn.getcwd() end,
         },

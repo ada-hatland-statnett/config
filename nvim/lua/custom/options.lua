@@ -30,12 +30,34 @@ vim.opt.scrolloff = 999
 vim.schedule(function() vim.o.clipboard = 'unnamedplus' end)
 
 -- Diagnostic config
+local function diagnostic_source(diagnostic)
+  local src = diagnostic.source or 'unknown'
+  -- Prefer the specific rule/linter code when available (e.g. ruff, sonarqube)
+  local code = diagnostic.code
+  if code and code ~= '' then src = string.format('%s: %s', src, code) end
+  return src
+end
+
 vim.diagnostic.config {
   update_in_insert = false,
   severity_sort = true,
-  float = { border = 'rounded', source = 'if_many' },
+  float = { border = 'rounded', source = true },
   underline = { severity = vim.diagnostic.severity.ERROR },
-  virtual_text = true,
-  virtual_lines = false,
+  -- Short, truncated inline text on every line except the cursor line
+  virtual_text = {
+    current_line = false,
+    format = function(diagnostic)
+      local msg = diagnostic.message:gsub('%s*\n%s*', ' ')
+      if #msg > 80 then msg = msg:sub(1, 79) .. '…' end
+      return string.format('%s (from %s)', msg, diagnostic_source(diagnostic))
+    end,
+  },
+  -- Full, wrapped multi-line text for the line the cursor is on
+  virtual_lines = {
+    current_line = true,
+    format = function(diagnostic)
+      return string.format('%s (from %s)', diagnostic.message, diagnostic_source(diagnostic))
+    end,
+  },
   jump = { float = true },
 }

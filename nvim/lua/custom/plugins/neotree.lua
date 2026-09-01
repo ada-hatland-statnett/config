@@ -15,6 +15,10 @@ return {
       'folke/snacks.nvim',
     },
     opts = {
+      -- Allow opening files into a terminal window (replacing it) instead of
+      -- forcing a new split. Default includes 'terminal', which caused files to
+      -- open in a separate split alongside the terminal window.
+      open_files_do_not_replace_types = { 'Trouble', 'qf', 'Outline' },
       filesystem = {
         follow_current_file = { enabled = true },
         filtered_items = { hide_gitignored = false },

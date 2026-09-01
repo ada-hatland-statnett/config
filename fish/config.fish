@@ -1,6 +1,22 @@
 status is-interactive; or exit
 
-fish_vi_key_bindings
+fish_default_key_bindings
+
+function __update_cwd_osc --on-variable PWD
+    printf '\e]7;file://%s%s\e\\' $hostname (string escape --style=url $PWD)
+end
+
+# Report the active Python virtualenv to the host terminal (nvim) via a custom
+# OSC sequence, mirroring the OSC 7 cwd trick above. Fires whenever a venv is
+# activated/deactivated so nvim can carry it back to the launching shell.
+function __update_venv_osc --on-variable VIRTUAL_ENV
+    printf '\e]6666;venv=%s\e\\' "$VIRTUAL_ENV"
+end
+
+# Ctrl-C clears the current command line. A running foreground
+# job still receives SIGINT from the terminal, so it keeps cancelling
+# operations as usual.
+bind \cc cancel-commandline
 fish_add_path -g "$HOME/.local/bin"
 
 set -gx XDG_CONFIG_HOME "$HOME/.config"
@@ -28,8 +44,55 @@ if test -x /home/linuxbrew/.linuxbrew/bin/brew
     /home/linuxbrew/.linuxbrew/bin/brew shellenv | source
 end
 
+# Auto-launch nvim as the default "terminal" (disabled).
+# Run `nvim-shell` to opt in for the current shell instead.
+# Guard against $NVIM so the shell inside nvim's own :terminal doesn't recurse.
+
+function nvim-shell --description 'Launch nvim, then return to fish inheriting its cwd/venv'
+    if set -q NVIM
+        return
+    end
+    set -gx NVIM_CWD_FILE (mktemp)
+    set -gx NVIM_VENV_FILE (mktemp)
+    nvim $argv
+    if test -s "$NVIM_CWD_FILE"
+        set -l nvim_cwd (command cat "$NVIM_CWD_FILE")
+        test -d "$nvim_cwd"; and cd "$nvim_cwd"
+    end
+    # Adopt whatever venv was active inside nvim's terminal, so the shell we
+    # drop back into has the same Python libraries available.
+    if test -s "$NVIM_VENV_FILE"
+        set -l nvim_venv (command cat "$NVIM_VENV_FILE")
+        if test -n "$nvim_venv" -a -f "$nvim_venv/bin/activate.fish"
+            if not test "$VIRTUAL_ENV" = "$nvim_venv"
+                functions -q deactivate; and deactivate
+                source "$nvim_venv/bin/activate.fish"
+            end
+        end
+    end
+    command rm -f "$NVIM_CWD_FILE" "$NVIM_VENV_FILE"
+    set -e NVIM_CWD_FILE
+    set -e NVIM_VENV_FILE
+end
+
 alias v 'nvim'
-alias e 'nvim'
+
+# `e` opens nvim normally, but inside nvim's :terminal it talks to the parent
+# instance instead of nesting a second nvim: no args toggles neo-tree, args are
+# opened as buffers in the parent.
+function e --wraps=nvim --description 'nvim, or drive the parent nvim from :terminal'
+    if not set -q NVIM
+        nvim $argv
+        return
+    end
+    if test (count $argv) -eq 0
+        # <C-\><C-N> leaves terminal-mode first so the command reaches nvim.
+        nvim --server $NVIM --remote-send '<C-\\><C-N>:Neotree toggle<CR>'
+    else
+        nvim --server $NVIM --remote $argv
+        nvim --server $NVIM --remote-send '<C-\\><C-N>'
+    end
+end
 alias s 'nvim main.tex'
 alias l 'eza --icons --time-style=long-iso --ignore-glob="__pycache__"'
 alias ls 'eza --icons --time-style=long-iso -a'
@@ -96,14 +159,15 @@ alias t 'tmux'
 alias gs 'git status'
 alias gsw 'git switch'
 alias gm 'git switch main'
+alias gmm 'git merge main'
 alias gc 'git commit -m'
 alias ga 'git add'
 alias gp 'git push'
 alias gb 'git branch'
-alias gd 'git diff'
 alias gr 'git restore'
 alias gpl 'git pull'
 alias gd 'git branch -d'
+alias gl 'git log main..'
 
 alias m 'make'
 alias mc 'make clean'

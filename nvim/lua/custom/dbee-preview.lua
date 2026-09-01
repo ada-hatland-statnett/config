@@ -11,11 +11,19 @@
 
 local M = {}
 
-local PAGE = 50
+local PAGE = 10
 
 -- State of the most recent preview, used to build filtered / paged re-runs.
 -- { schema = string, table = string, where = string|nil, offset = integer }
 local last_preview = nil
+
+-- Calls already executed this session, keyed by "schema.table" (lowercased).
+-- Only unfiltered, first-page previews are remembered, so re-previewing a table
+-- can re-display the existing result set instead of hitting the database again.
+local session_calls = {}
+
+--- @return string
+local function preview_key(schema, tbl) return (schema .. '.' .. tbl):lower() end
 
 --- Build the preview query string from the current `last_preview` state.
 --- @param fetch_count integer  number of rows to fetch
@@ -74,19 +82,34 @@ local function run_current()
     return
   end
 
-  ensure_retry_listener()
-
   local query = build_query(PAGE)
-  -- Execute via the core API so we get the call id for retry detection,
-  -- then hand it to the UI + open dbee.
   local ui = require 'dbee.api.ui'
   local call = core.connection_execute(conn.id, query)
   ui.result_set_call(call)
-  require('dbee').open()
-
-  if call and call.id then
-    pending_retry = { call_id = call.id }
+  if call and not (p.where and p.where ~= '') and p.offset == 0 then
+    session_calls[preview_key(p.schema, p.table)] = call
   end
+  require('dbee').open()
+end
+
+--- Re-display an already executed call for schema.table, if we have one.
+--- @return boolean  true if the cached result was shown
+local function show_cached(schema, tbl)
+  local key = preview_key(schema, tbl)
+  local call = session_calls[key]
+  if not call then return false end
+
+  local ok = pcall(function()
+    require('dbee.api.ui').result_set_call(call)
+    require('dbee').open()
+  end)
+  if not ok then
+    session_calls[key] = nil
+    return false
+  end
+
+  last_preview = { schema = schema, table = tbl, where = nil, offset = 0 }
+  return true
 end
 
 --- Start a fresh preview of schema.table (offset 0, no filter).
@@ -95,7 +118,43 @@ local function start_preview(schema, tbl)
   run_current()
 end
 
+--- Jump to the definition of a CTE named `name` in the current buffer.
+--- Matches `name AS (` (optionally preceded by `WITH` or a comma).
+--- @return boolean  true if a definition was found and the cursor moved
+local function jump_to_cte(name)
+  local bufnr = vim.api.nvim_get_current_buf()
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local needle = name:lower()
+
+  for lnum, line in ipairs(lines) do
+    local lower = line:lower()
+    local init = 1
+    while true do
+      local s, e = lower:find(needle, init, true)
+      if not s then break end
+      -- must be a whole word ...
+      local before = s > 1 and lower:sub(s - 1, s - 1) or ''
+      local after_ok = not lower:sub(e + 1, e + 1):match '[%w_]'
+      if not before:match '[%w_.]' and after_ok then
+        -- ... followed by `AS (` (materialization hints allowed)
+        local rest = lower:sub(e + 1)
+        if rest:match '^%s+as%s*%(' or rest:match '^%s+as%s+n?o?t?%s*materialized%s*%(' then
+          vim.cmd "normal! m'" -- keep the jumplist usable with <C-o>
+          vim.api.nvim_win_set_cursor(0, { lnum, s - 1 })
+          vim.cmd 'normal! zz'
+          return true
+        end
+      end
+      init = s + 1
+    end
+  end
+  return false
+end
+
 --- Preview the table named by the word under the cursor (in a .sql buffer).
+--- If the table was already previewed this session, the existing result set is
+--- re-displayed instead of re-running the query. If the name is not a known
+--- table, jump to a CTE of that name in the current buffer instead.
 function M.preview_under_cursor()
   local word = vim.fn.expand '<cword>'
   if word == '' then
@@ -105,9 +164,12 @@ function M.preview_under_cursor()
 
   local schema = require('custom.blink-dbee').get_schema_for_table(word)
   if not schema then
-    vim.notify('Table "' .. word .. '" not found in cache. Try <leader>R to refresh.', vim.log.levels.WARN)
+    if jump_to_cte(word) then return end
+    vim.notify('Table "' .. word .. '" not found in cache and no CTE by that name. Try <leader>R to refresh.', vim.log.levels.WARN)
     return
   end
+
+  if show_cached(schema, word) then return end
 
   start_preview(schema, word)
 end
@@ -268,6 +330,9 @@ function M.load_prev()
   vim.notify(string.format('Loading rows %d-%d', last_preview.offset + 1, last_preview.offset + PAGE), vim.log.levels.INFO)
   run_current()
 end
+
+--- Forget all previews remembered this session (next `grd` re-queries).
+function M.clear_session_cache() session_calls = {} end
 
 --------------------------------------------------------------------------------
 -- Sticky header: pin the column-name row in the window's winbar so it stays

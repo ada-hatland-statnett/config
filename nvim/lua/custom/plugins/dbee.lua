@@ -79,7 +79,7 @@ return {
         ft = 'sql',
       },
       {
-        '<leader>t',
+        'grd',
         function() require('custom.dbee-preview').preview_under_cursor() end,
         desc = 'Preview table under cursor (first 50 rows)',
         ft = 'sql',
@@ -88,6 +88,7 @@ return {
         '<leader>R',
         function()
           require('custom.blink-dbee').clear_cache()
+          require('custom.dbee-preview').clear_session_cache()
           vim.notify 'Table cache cleared (columns.json preserved)'
         end,
         desc = 'Clear table cache',
@@ -97,13 +98,11 @@ return {
         '<leader>T',
         function() require('custom.dbee-preview').preview_pick() end,
         desc = 'List tables and preview',
-        ft = 'sql',
       },
       {
         '<leader>l',
         function() require('custom.dbee-preview').find_column(false) end,
         desc = 'Find column (cached)',
-        ft = 'sql',
       },
       {
         '<leader>L',

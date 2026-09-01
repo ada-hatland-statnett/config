@@ -201,7 +201,7 @@ function M.run_buffer()
 
   local conn = core.get_current_connection()
   if not conn then
-    vim.notify('No active dbee connection. Open dbee (<leader>p) and select one.', vim.log.levels.WARN)
+    vim.notify('No active dbee connection. Open dbee and select one.', vim.log.levels.WARN)
     return
   end
 
@@ -248,7 +248,7 @@ function M.run_selection()
 
   local utils = require 'dbee.utils'
   if not require('dbee.api.core').get_current_connection() then
-    vim.notify('No active dbee connection. Open dbee (<leader>p) and select one.', vim.log.levels.WARN)
+    vim.notify('No active dbee connection. Open dbee and select one.', vim.log.levels.WARN)
     return
   end
 
