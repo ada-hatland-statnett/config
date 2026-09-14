@@ -37,6 +37,12 @@ set -gx PYTHON_KEYRING_BACKEND keyring.backends.null.Keyring
 set -gx PYTHONSTARTUP "$HOME/.config/python/pythonrc"
 set -gx R_LIBS_USER "$HOME/.rlibrary/library"
 
+if test -r $HOME/.sonarqube_token
+    read -gx SONARQUBE_TOKEN <$HOME/.sonarqube_token
+else if status is-interactive
+    echo "warning: $HOME/.sonarqube_token not found; SONARQUBE_TOKEN unset" >&2
+end
+
 zoxide init fish | source
 alias c 'z'
 
@@ -335,3 +341,48 @@ set -g fish_color_error brred
 set -gx LD_LIBRARY_PATH /opt/oracle/instantclient_23_26 $LD_LIBRARY_PATH
 set -gx PATH /opt/oracle/instantclient_23_26 $PATH
 set -gx TNS_ADMIN /opt/oracle/instantclient_23_26/network/admin
+
+function authenticate_to_github --description "Configure gh CLI auth from ~/.github_token"
+    set -l token_file "$HOME/.github_token"
+    set -l username (whoami)
+
+    # Already authenticated? nothing to do.
+    if gh auth status >/dev/null 2>&1
+        return 0
+    end
+
+    if not test -f "$token_file"
+        echo "Error: GitHub token file not found at $token_file" >&2
+        echo "Create it with: gh auth login; gh auth token > $token_file; and chmod 600 $token_file" >&2
+        return 1
+    end
+
+    set -l token (tr -d '\n\r' < "$token_file" 2>/dev/null)
+    if test -z "$token"
+        echo "Error: Could not read token from $token_file or file is empty" >&2
+        return 1
+    end
+
+    mkdir -p ~/.config/gh
+
+    printf 'github.com:\n    oauth_token: %s\n    user: %s\n    git_protocol: https\n' \
+        "$token" "$username" > ~/.config/gh/hosts.yml
+    chmod 600 ~/.config/gh/hosts.yml
+
+    if gh auth setup-git >/dev/null 2>&1
+        echo "GitHub CLI authentication configured successfully"
+    else
+        echo "Warning: git integration setup failed, but auth should still work" >&2
+    end
+
+    if gh auth status >/dev/null 2>&1
+        echo "Authenticated as "(gh api user --jq .login)
+    else
+        echo "Authentication setup failed" >&2
+        return 1
+    end
+end
+
+if type -q gh
+    authenticate_to_github
+end

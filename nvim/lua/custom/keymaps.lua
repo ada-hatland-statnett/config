@@ -95,6 +95,7 @@ vim.keymap.set('n', '<leader>t', function()
   if vim.bo.buftype ~= '' then vim.cmd 'new' end
   vim.cmd 'enew'
   vim.cmd 'terminal'
+  vim.cmd 'startinsert'
 end, { desc = 'Open terminal' })
 vim.keymap.set('n', 'U', '<C-r>', { noremap = true, silent = true })
 
@@ -167,18 +168,35 @@ end, { desc = 'Show cursor column position' })
 -- Toggle full multi-line diagnostics for ALL lines (vs. just the cursor line)
 vim.keymap.set('n', '<leader>dl', function()
   local cfg = vim.diagnostic.config()
-  local cursor_only = not (cfg.virtual_lines and cfg.virtual_lines.current_line == false)
+  local cursor_only = not (
+    cfg.virtual_lines and cfg.virtual_lines.current_line == false
+  )
   if cursor_only then
     vim.diagnostic.config {
-      virtual_lines = vim.tbl_extend('force', type(cfg.virtual_lines) == 'table' and cfg.virtual_lines or {}, { current_line = false }),
+      virtual_lines = vim.tbl_extend(
+        'force',
+        type(cfg.virtual_lines) == 'table' and cfg.virtual_lines or {},
+        { current_line = false }
+      ),
       virtual_text = false,
     }
     vim.notify('Diagnostics: full text on all lines', vim.log.levels.INFO)
   else
     vim.diagnostic.config {
-      virtual_lines = vim.tbl_extend('force', type(cfg.virtual_lines) == 'table' and cfg.virtual_lines or {}, { current_line = true }),
-      virtual_text = vim.tbl_extend('force', type(cfg.virtual_text) == 'table' and cfg.virtual_text or {}, { current_line = false }),
+      virtual_lines = vim.tbl_extend(
+        'force',
+        type(cfg.virtual_lines) == 'table' and cfg.virtual_lines or {},
+        { current_line = true }
+      ),
+      virtual_text = vim.tbl_extend(
+        'force',
+        type(cfg.virtual_text) == 'table' and cfg.virtual_text or {},
+        { current_line = false }
+      ),
     }
-    vim.notify('Diagnostics: full text on cursor line only', vim.log.levels.INFO)
+    vim.notify(
+      'Diagnostics: full text on cursor line only',
+      vim.log.levels.INFO
+    )
   end
 end, { desc = '[D]iagnostic virtual [L]ines toggle' })
