@@ -37,8 +37,14 @@ set -gx PYTHON_KEYRING_BACKEND keyring.backends.null.Keyring
 set -gx PYTHONSTARTUP "$HOME/.config/python/pythonrc"
 set -gx R_LIBS_USER "$HOME/.rlibrary/library"
 
-if test -r $HOME/.sonarqube_token
-    read -gx SONARQUBE_TOKEN <$HOME/.sonarqube_token
+if test -r $HOME/.sonarqube_token_user
+    read -gx SONARQUBE_TOKEN_USER <$HOME/.sonarqube_token_user
+else if status is-interactive
+    echo "warning: $HOME/.sonarqube_token not found; SONARQUBE_TOKEN unset" >&2
+end
+
+if test -r $HOME/.sonarqube_token_project
+    read -gx SONARQUBE_TOKEN_PROJECT <$HOME/.sonarqube_token_project
 else if status is-interactive
     echo "warning: $HOME/.sonarqube_token not found; SONARQUBE_TOKEN unset" >&2
 end
@@ -165,7 +171,7 @@ alias t 'tmux'
 alias gs 'git status'
 alias gsw 'git switch'
 alias gm 'git switch main'
-alias gmm 'git merge main'
+alias gmm 'git pull originmain'
 alias gc 'git commit -m'
 alias ga 'git add'
 alias gp 'git push'
@@ -185,9 +191,8 @@ alias py 'python3 -q'
 
 # other aliases
 alias :q 'exit'
-alias pac 'sudo pacman -Syu'
 alias close 'disown; exit'
-alias tlmgr '/usr/share/texmf-dist/scripts/texlive/tlmgr.pl --usermode'
+alias j 'jiratui ui'
 
 # ---------- Functions ----------
 function act --description "Activate repo-root .venv if present"
