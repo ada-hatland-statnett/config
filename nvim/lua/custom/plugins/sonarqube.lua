@@ -18,13 +18,12 @@
 local SERVER_URL = 'https://sonar.elhub.cloud'
 local CONNECTION_ID = 'elhub'
 
--- Map a repo root (basename) to its SonarQube projectKey. Only needed for repos
--- that ship neither .sonarlint/connectedMode.json nor sonar-project.properties.
+-- Fallback binding for repos that ship neither .sonarlint/connectedMode.json
+-- nor sonar-project.properties: everything under the watson workspace shares
+-- the insight project, since none of those repos has a project of its own.
 -- Run `:SonarQubeProjects` to list the real keys from the server.
-local PROJECT_KEYS = {
-  ['insight'] = 'no.elhub.insight.analytics-insight',
-  ['analytics-insight'] = 'no.elhub.insight.analytics-insight',
-}
+local INSIGHT_KEY = 'no.elhub.insight.analytics-insight'
+local WATSON_DIR = vim.fs.normalize '~/git/watson'
 
 local function git_root()
   local dir = vim.fs.dirname(
@@ -55,8 +54,18 @@ local function resolve_project_key(root)
     end
   end
 
-  -- 3. Manual override, keyed by repo directory name.
-  return PROJECT_KEYS[vim.fs.basename(root)]
+  -- 3. Anything inside the watson workspace binds to the insight project.
+  -- Compare with a trailing slash so a sibling like `watson-toolbox` sitting
+  -- next to `watson/` can't match on the prefix alone.
+  local normalised = vim.fs.normalize(root)
+  if
+    normalised == WATSON_DIR
+    or vim.startswith(normalised, WATSON_DIR .. '/')
+  then
+    return INSIGHT_KEY
+  end
+
+  return nil
 end
 
 return {

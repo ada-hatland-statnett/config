@@ -36,17 +36,18 @@ set -gx GPG_TTY (tty)
 set -gx PYTHON_KEYRING_BACKEND keyring.backends.null.Keyring
 set -gx PYTHONSTARTUP "$HOME/.config/python/pythonrc"
 set -gx R_LIBS_USER "$HOME/.rlibrary/library"
+set -gx TOKEN_DIR "$HOME/.tokens"
 
-if test -r $HOME/.sonarqube_token_user
-    read -gx SONARQUBE_TOKEN_USER <$HOME/.sonarqube_token_user
+if test -r $TOKEN_DIR/.sonarqube_token_user
+    read -gx SONARQUBE_TOKEN_USER <$TOKEN_DIR/.sonarqube_token_user
 else if status is-interactive
-    echo "warning: $HOME/.sonarqube_token not found; SONARQUBE_TOKEN unset" >&2
+    echo "warning: $TOKEN_DIR/.sonarqube_token not found; SONARQUBE_TOKEN unset" >&2
 end
 
-if test -r $HOME/.sonarqube_token_project
-    read -gx SONARQUBE_TOKEN_PROJECT <$HOME/.sonarqube_token_project
+if test -r $TOKEN_DIR/.jira_token
+    read -gx JIRA_TOKEN <$TOKEN_DIR/.jira_token
 else if status is-interactive
-    echo "warning: $HOME/.sonarqube_token not found; SONARQUBE_TOKEN unset" >&2
+    echo "warning: $TOKEN_DIR/.sonarqube_token not found; JIRA_TOKEN unset" >&2
 end
 
 zoxide init fish | source
@@ -171,7 +172,7 @@ alias t 'tmux'
 alias gs 'git status'
 alias gsw 'git switch'
 alias gm 'git switch main'
-alias gmm 'git pull originmain'
+alias gmm 'git pull origin main'
 alias gc 'git commit -m'
 alias ga 'git add'
 alias gp 'git push'
@@ -180,6 +181,16 @@ alias gr 'git restore'
 alias gpl 'git pull'
 alias gd 'git branch -d'
 alias gl 'git log main..'
+
+function clone
+    test (count $argv) -eq 1; or begin
+        echo "usage: clone <repo>" >&2
+        return 2
+    end
+    git clone "git@github.com:elhub/$argv[1].git"; or return
+    set -l repo_name (basename $argv[1] .git)
+    builtin cd $repo_name; or return
+end
 
 alias m 'make'
 alias mc 'make clean'
@@ -192,7 +203,7 @@ alias py 'python3 -q'
 # other aliases
 alias :q 'exit'
 alias close 'disown; exit'
-alias j 'jiratui ui'
+alias j 'jiratui ui -j 2'
 
 # ---------- Functions ----------
 function act --description "Activate repo-root .venv if present"
