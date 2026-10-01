@@ -185,6 +185,27 @@ alias gpl 'git pull'
 alias gd 'git branch -d'
 alias gl 'git log main..'
 
+# Browse a remote branch (default origin/main) read-only in nvim via a
+# temporary worktree. nvim removes the worktree on exit (see
+# nvim/lua/custom/autocmds.lua, $REMOTE_VIEW_WORKTREE).
+function grv --description 'Browse a remote branch in nvim via a temporary worktree'
+    set -l ref (string join '' $argv[1])
+    test -n "$ref"; or set ref origin/main
+    set -l repo (git rev-parse --show-toplevel); or return
+    set -l remote (string split -m1 / $ref)[1]
+    git -C $repo fetch --quiet $remote; or return
+    set -l dir (mktemp -d /tmp/remote-view-(basename $repo)-XXXXXX)
+    git -C $repo worktree add --quiet --detach $dir $ref; or begin
+        command rm -rf $dir
+        return 1
+    end
+    # Plain `command nvim` (not nvim-shell): the cwd it would hand back is
+    # about to be deleted.
+    pushd $dir
+    REMOTE_VIEW_REPO=$repo REMOTE_VIEW_WORKTREE=$dir command nvim -R .
+    popd
+end
+
 function clone
     test (count $argv) -eq 1; or begin
         echo "usage: clone <repo>" >&2

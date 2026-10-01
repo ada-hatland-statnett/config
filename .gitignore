@@ -1,6 +1,8 @@
 *
 !nvim
 !fish
+!jiratui
+!ruff
+!opencode
 !.gitignore
-!.starship.toml
-!.jiratui
+!starship.toml

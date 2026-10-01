@@ -1,0 +1,20 @@
+[directory]
+truncation_length = 2
+truncate_to_repo = false
+style = "bold #ff79c6"
+
+[git_branch]
+style = "bold #ffb86c"
+
+[git_status]
+style = "bold #ff5555"
+
+[python]
+style = "bold #f1fa8c"
+
+[cmd_duration]
+style = "bold #8be9fd"
+
+[character]
+success_symbol = "[❯](bold #50fa7b)"
+error_symbol = "[❯](bold #ff5555)"

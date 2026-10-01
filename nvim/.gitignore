@@ -10,3 +10,4 @@ lazysql
 lazy-lock.json
 
 .DS_Store
+lua/custom/db_connections.lua

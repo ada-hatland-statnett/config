@@ -86,6 +86,23 @@ vim.api.nvim_create_autocmd('VimLeavePre', {
   end,
 })
 
+-- Remove the temporary worktree created by the fish `grv` function on exit.
+if vim.env.REMOTE_VIEW_WORKTREE and vim.env.REMOTE_VIEW_REPO then
+  vim.api.nvim_create_autocmd('VimLeavePre', {
+    desc = 'Remove the grv remote-view worktree',
+    callback = function()
+      local dir, repo = vim.env.REMOTE_VIEW_WORKTREE, vim.env.REMOTE_VIEW_REPO
+      -- Leave the worktree first so nothing holds it open.
+      pcall(vim.cmd.cd, vim.fn.fnameescape(repo))
+      vim.fn.system { 'git', '-C', repo, 'worktree', 'remove', '--force', dir }
+      if vim.v.shell_error ~= 0 then
+        vim.fn.delete(dir, 'rf')
+        vim.fn.system { 'git', '-C', repo, 'worktree', 'prune' }
+      end
+    end,
+  })
+end
+
 -- Python-specific keymaps
 vim.api.nvim_create_autocmd('FileType', {
   pattern = 'python',
