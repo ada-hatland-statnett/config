@@ -2,6 +2,11 @@ status is-interactive; or exit
 
 fish_default_key_bindings
 
+if status is-interactive
+    set -gx SSH_AUTH_SOCK (bash -c 'eval "$(SHELL=/bin/sh keychain --eval --quiet "$HOME/.ssh/id_ed25519")"; printf "%s" "$SSH_AUTH_SOCK"')
+    set -g fish_greeting "🐟🐟🐟bem-vinda🐟🐟🐟"
+end
+
 function __update_cwd_osc --on-variable PWD
     printf '\e]7;file://%s%s\e\\' $hostname (string escape --style=url $PWD)
 end
@@ -38,16 +43,16 @@ set -gx PYTHONSTARTUP "$HOME/.config/python/pythonrc"
 set -gx R_LIBS_USER "$HOME/.rlibrary/library"
 set -gx TOKEN_DIR "$HOME/.tokens"
 
-if test -r $TOKEN_DIR/.sonarqube_token_user
-    read -gx SONARQUBE_TOKEN_USER <$TOKEN_DIR/.sonarqube_token_user
+if test -r $TOKEN_DIR/.sonarqube_token
+    read -gx SONARQUBE_TOKEN <$TOKEN_DIR/.sonarqube_token
 else if status is-interactive
     echo "warning: $TOKEN_DIR/.sonarqube_token not found; SONARQUBE_TOKEN unset" >&2
 end
 
 if test -r $TOKEN_DIR/.jira_token
-    read -gx JIRA_TOKEN <$TOKEN_DIR/.jira_token
+    read -gx JIRA_API_TOKEN <$TOKEN_DIR/.jira_token
 else if status is-interactive
-    echo "warning: $TOKEN_DIR/.sonarqube_token not found; JIRA_TOKEN unset" >&2
+    echo "warning: $TOKEN_DIR/.jira_token not found; JIRA_TOKEN unset" >&2
 end
 
 zoxide init fish | source
@@ -159,14 +164,12 @@ function cd --wraps=cd
 end
 
 # ---------- Aliases ----------
-alias mosh 'mosh --no-init'
 alias tree 'tree -L 3 -C'
 alias mv 'mv --interactive'
 alias .. 'cd ..'
 alias ... 'cd ../..'
 alias .... 'cd ../../..'
 alias cal 'cal -m'
-alias t 'tmux'
 
 # git aliases
 alias gs 'git status'
@@ -203,7 +206,7 @@ alias py 'python3 -q'
 # other aliases
 alias :q 'exit'
 alias close 'disown; exit'
-alias j 'jiratui ui -j 2'
+alias j 'jiratui ui -j 1'
 
 # ---------- Functions ----------
 function act --description "Activate repo-root .venv if present"
@@ -307,45 +310,6 @@ function cl
     cat -- "$argv[1]" | clip.exe
 end
 
-function fish_prompt
-    set -l last_status $status
-
-    set -l host_short (prompt_hostname)
-    set host_short (string split '.' -- $host_short)[1]
-
-    set -l cwd (prompt_pwd)
-
-    set -l git_part ""
-    if command git rev-parse --is-inside-work-tree >/dev/null 2>&1
-        set -l branch (command git symbolic-ref --short HEAD 2>/dev/null)
-        if test -z "$branch"
-            set branch (command git rev-parse --short HEAD 2>/dev/null)
-        end
-        if test -n "$branch"
-            set git_part "$branch"
-        end
-    end
-
-    set -l c_status (set_color brred)
-    set -l c_host   (set_color normal)
-    set -l c_cwd    (set_color blue)      # was invalid numeric 27
-    set -l c_git    (set_color bryellow)
-    set -l c_reset  (set_color normal)
-
-    # Prevent [] from being interpreted as index: split output pieces
-    echo -n $c_status"["$last_status"]"$c_reset" "
-    echo -n $c_host$host_short":"$c_reset
-    echo -n $c_cwd$cwd$c_reset
-    if test -n "$git_part"
-        echo -n " "$c_git$git_part$c_reset
-    end
-
-    echo
-    echo -n " ▪ "
-end
-
-source ~/.config/fish/functions/fish_prompt.fish
-commandline -f repaint
 
 set -g fish_color_command normal
 set -g fish_color_param normal
@@ -402,3 +366,5 @@ end
 if type -q gh
     authenticate_to_github
 end
+
+starship init fish | source

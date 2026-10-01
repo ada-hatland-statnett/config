@@ -10,6 +10,18 @@ return {
       vim.cmd 'Copilot disable'
       vim.g.copilot_enabled = 0
     end,
+    config = function()
+      -- Shim: copilot.vim still calls deprecated client.notify() (unfixed upstream)
+      local ok, copilot = pcall(require, '_copilot')
+      if ok then
+        copilot.did_change_configuration = function(client_id, settings)
+          local client = vim.lsp.get_client_by_id(client_id)
+          if not client then return end
+          client.settings = settings
+          return client:notify('workspace/didChangeConfiguration', { settings = settings })
+        end
+      end
+    end,
     keys = {
       {
         '<leader><tab>',

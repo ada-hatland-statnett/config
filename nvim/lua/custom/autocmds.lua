@@ -8,14 +8,41 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   callback = function() vim.hl.on_yank() end,
 })
 
--- On startup with no file arguments, open an empty buffer with Neo-tree toggled open
+-- Per-repo sessions: saved by `M` (see keymaps), restored on bare `nvim`
+vim.opt.sessionoptions = 'buffers,curdir,folds,tabpages,winsize'
+
+local function session_file()
+  local root = vim.fs.root(vim.fn.getcwd(), '.git') or vim.fn.getcwd()
+  local dir = vim.fn.stdpath 'state' .. '/sessions'
+  vim.fn.mkdir(dir, 'p')
+  return dir .. '/' .. root:gsub('[/\\:]', '%%') .. '.vim'
+end
+
+function _G.SaveSession()
+  -- Drop special windows/buffers (neo-tree, terminals, etc.) that don't restore well
+  pcall(vim.cmd, 'Neotree close')
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.bo[buf].buftype ~= '' then pcall(vim.api.nvim_buf_delete, buf, { force = true }) end
+  end
+  vim.cmd('silent! mksession! ' .. vim.fn.fnameescape(session_file()))
+end
+
+-- On startup with no file arguments, restore the repo session, else open Neo-tree
 vim.api.nvim_create_autocmd('VimEnter', {
-  callback = function()
+  nested = true,
+  callback = vim.schedule_wrap(function()
+    -- Scheduled so lazy.nvim finishes its VimEnter handling before the session
+    -- wipes the initial buffer (otherwise: "Invalid buffer id: 1")
     if vim.fn.argc() == 0 then
       if vim.fn.exists 'g:started_by_firenvim' == 1 then return end
-      vim.cmd 'Neotree toggle'
+      local file = session_file()
+      if vim.fn.filereadable(file) == 1 then
+        vim.cmd('silent! source ' .. vim.fn.fnameescape(file))
+      else
+        vim.cmd 'Neotree toggle'
+      end
     end
-  end,
+  end),
 })
 
 -- Follow the terminal shell's working directory (fish emits OSC 7 on each prompt).

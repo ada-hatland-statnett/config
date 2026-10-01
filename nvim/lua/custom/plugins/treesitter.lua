@@ -4,12 +4,10 @@ return {
     'nvim-treesitter/nvim-treesitter',
     config = function()
       local filetypes = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'sql', 'python' }
-      require('nvim-treesitter').setup {
-        highlight = { enable = true },
-        indent = { enable = true },
-        ensure_installed = filetypes,
-        auto_install = true,
-      }
+      -- nvim-treesitter `main` ignores ensure_installed/highlight options;
+      -- parsers must be installed explicitly (no-op if already present).
+      require('nvim-treesitter').setup {}
+      require('nvim-treesitter').install(filetypes)
       vim.api.nvim_create_autocmd('FileType', {
         pattern = filetypes,
         callback = function()

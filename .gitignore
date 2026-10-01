@@ -2,3 +2,5 @@
 !nvim
 !fish
 !.gitignore
+!.starship.toml
+!.jiratui

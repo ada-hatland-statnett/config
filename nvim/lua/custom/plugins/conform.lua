@@ -32,19 +32,19 @@ return {
         yaml = { 'prettier' },
       },
       formatters = {
-        -- Max line width 80 for the formatters below. Python is the exception
-        -- at 88 (ruff's default) -- see the note further down.
+        -- Max line width 160 for the formatters below. Python's is set in
+        -- ruff.toml -- see the note further down.
         stylua = {
-          prepend_args = { '--column-width', '80' },
+          prepend_args = { '--column-width', '160' },
         },
         -- NOTE: ruff takes no line-length flag here. `prepend_args` inserts
         -- before conform's own args, producing `ruff --line-length 80 format
         -- ...`, and ruff requires the subcommand first -- so the whole
         -- invocation errors out and nothing is formatted. Line length for both
-        -- ruff_format and ruff_organize_imports is 88, set in
+        -- ruff_format and ruff_organize_imports is 160, set in
         -- ~/.config/ruff/ruff.toml.
         prettier = {
-          prepend_args = { '--print-width', '80' },
+          prepend_args = { '--print-width', '160' },
         },
         sqlfluff = {
           command = 'sqlfluff',

@@ -74,8 +74,11 @@ vim.keymap.set(
 vim.keymap.set(
   'n',
   'M',
-  function() vim.cmd 'q' end,
-  { silent = true, desc = 'Quit Neovim' }
+  function()
+    _G.SaveSession()
+    vim.cmd 'qa!'
+  end,
+  { silent = true, desc = 'Save session and quit Neovim' }
 )
 vim.keymap.set('n', '<leader>d', function()
   local pid = vim.b.terminal_job_pid

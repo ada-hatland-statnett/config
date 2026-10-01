@@ -1,18 +1,8 @@
 return {
   {
     '3rd/image.nvim',
-    -- image.nvim needs magick_rock (luarocks) or the magick CLI to decode
-    -- images. rocks.nvim/lazy can install the rock automatically.
+    -- Uses the ImageMagick CLI (processor = 'magick_cli'), so no luarocks needed.
     build = false,
-    dependencies = {
-      {
-        'vhyrro/luarocks.nvim',
-        priority = 1001, -- load before image.nvim
-        opts = {
-          rocks = { 'magick' },
-        },
-      },
-    },
     opts = {
       backend = 'kitty', -- WezTerm supports the kitty graphics protocol
       processor = 'magick_cli', -- use ImageMagick CLI (you have `convert`/`magick`)

@@ -23,10 +23,30 @@ vim.o.inccommand = 'split'
 vim.o.cursorline = true
 vim.o.confirm = true
 
+-- Use fish for :terminal (and :! commands)
+local fish = vim.fn.exepath 'fish'
+if fish ~= '' then vim.o.shell = fish end
+
 vim.opt.listchars = { tab = '» ', trail = '·', nbsp = '␣' }
 vim.opt.scrolloff = 999
 
 -- Sync clipboard between OS and Neovim
+-- On WSL: copy via clip.exe (shows up in Windows clipboard + Win+V history).
+-- Input is converted to UTF-16LE so non-ASCII (æøå etc.) survives.
+if vim.fn.has 'wsl' == 1 then
+  local copy = { 'sh', '-c', 'iconv -f UTF-8 -t UTF-16LE | /mnt/c/Windows/System32/clip.exe' }
+  -- Base64 round-trip avoids PowerShell's console encoding mangling UTF-8
+  local paste = {
+    'sh', '-c',
+    [[/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoLogo -NoProfile -c '$c = Get-Clipboard -Raw; if ($c) { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($c.Replace("`r", ""))) }' | base64 -d]],
+  }
+  vim.g.clipboard = {
+    name = 'WslClipboard',
+    copy = { ['+'] = copy, ['*'] = copy },
+    paste = { ['+'] = paste, ['*'] = paste },
+    cache_enabled = 0,
+  }
+end
 vim.schedule(function() vim.o.clipboard = 'unnamedplus' end)
 
 -- Diagnostic config
@@ -59,5 +79,7 @@ vim.diagnostic.config {
       return string.format('%s (from %s)', diagnostic.message, diagnostic_source(diagnostic))
     end,
   },
-  jump = { float = true },
+  jump = {
+    on_jump = function(_, bufnr) vim.diagnostic.open_float { bufnr = bufnr, scope = 'cursor', focus = false } end,
+  },
 }

@@ -5,7 +5,12 @@ return {
     dependencies = { 'MunifTanjim/nui.nvim' },
     build = function() require('dbee').install() end,
     config = function()
-      require('dbee').setup(--[[optional config]])
+      -- Connections are shared with sqls (see custom/db-connections.lua).
+      require('dbee').setup {
+        sources = {
+          require('dbee.sources').MemorySource:new(require('custom.db-connections').get(), 'config'),
+        },
+      }
 
       local function resize_result_window(win)
         if not win or not vim.api.nvim_win_is_valid(win) then return end
@@ -17,7 +22,10 @@ return {
         if vim.o.laststatus > 0 then available_rows = available_rows - 1 end
 
         local showtabline = vim.o.showtabline
-        if showtabline == 2 or (showtabline == 1 and #vim.api.nvim_list_tabpages() > 1) then
+        if
+          showtabline == 2
+          or (showtabline == 1 and #vim.api.nvim_list_tabpages() > 1)
+        then
           available_rows = available_rows - 1
         end
 
@@ -32,23 +40,40 @@ return {
           local name = vim.api.nvim_buf_get_name(ev.buf)
           if name:match 'dbee%-result' then
             local preview = function() return require 'custom.dbee-preview' end
-            vim.keymap.set('n', '<leader>f', function() preview().filter_column() end, {
-              buffer = ev.buf,
-              desc = 'Filter previewed table by column under cursor',
-            })
-            vim.keymap.set('n', '<leader>m', function() preview().load_next() end, {
-              buffer = ev.buf,
-              desc = 'Load next 50 rows',
-            })
-            vim.keymap.set('n', '<leader>M', function() preview().load_prev() end, {
-              buffer = ev.buf,
-              desc = 'Load previous 50 rows',
-            })
+            vim.keymap.set(
+              'n',
+              '<leader>f',
+              function() preview().filter_column() end,
+              {
+                buffer = ev.buf,
+                desc = 'Filter previewed table by column under cursor',
+              }
+            )
+            vim.keymap.set(
+              'n',
+              '<leader>m',
+              function() preview().load_next() end,
+              {
+                buffer = ev.buf,
+                desc = 'Load next 50 rows',
+              }
+            )
+            vim.keymap.set(
+              'n',
+              '<leader>M',
+              function() preview().load_prev() end,
+              {
+                buffer = ev.buf,
+                desc = 'Load previous 50 rows',
+              }
+            )
             -- keep the column header pinned while scrolling
             preview().enable_sticky_header(ev.buf)
 
             local win = vim.fn.bufwinid(ev.buf)
-            if win ~= -1 then vim.schedule(function() resize_result_window(win) end) end
+            if win ~= -1 then
+              vim.schedule(function() resize_result_window(win) end)
+            end
           end
         end,
       })
@@ -64,7 +89,11 @@ return {
       })
     end,
     keys = {
-      { '<leader>D', function() require('dbee').toggle() end, desc = 'Database UI toggle' },
+      {
+        '<leader>D',
+        function() require('dbee').toggle() end,
+        desc = 'Database UI toggle',
+      },
       {
         '<leader>r',
         function() require('custom.dbee-runner').run_buffer() end,

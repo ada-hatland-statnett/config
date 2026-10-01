@@ -10,13 +10,36 @@
 -- lazily, at client-start time in its FileType autocmd. So registering handlers
 -- and extending settings *after* `setup()` still takes effect.
 --
--- Requires SONARQUBE_TOKEN_USER in the environment (a *user* token, generated
+-- Requires SONARQUBE_TOKEN in the environment (a *user* token, generated
 -- at https://sonar.elhub.cloud/account/security). A project-analysis token is
 -- not enough: it cannot read the quality profile, so you silently fall back to
 -- the built-in ruleset.
+--
+-- Also requires the eltostratus OpenVPN: sonar.elhub.cloud is only reachable
+-- through it. Without it the server can't sync and analysis silently yields
+-- nothing, so startup is skipped (with a warning) until the VPN is up.
 
 local SERVER_URL = 'https://sonar.elhub.cloud'
 local CONNECTION_ID = 'elhub'
+local SERVER_HOST = 'sonar.elhub.cloud'
+
+--- The eltostratus OpenVPN runs on the Windows host (WSL2), so there is no
+--- tun device to inspect here. sonar.elhub.cloud only resolves while the VPN
+--- is connected, which is exactly the condition we care about.
+--- Resolution is done asynchronously: without the VPN the lookup can hang
+--- until the resolver times out, which would freeze the UI if done inline.
+--- `cb(up)` is invoked on the main loop.
+local function vpn_up(cb)
+  vim.uv.getaddrinfo(
+    SERVER_HOST,
+    nil,
+    { socktype = 'stream' },
+    function(err, res)
+      local up = not err and res ~= nil and #res > 0
+      vim.schedule(function() cb(up) end)
+    end
+  )
+end
 
 -- Fallback binding for repos that ship neither .sonarlint/connectedMode.json
 -- nor sonar-project.properties: everything under the watson workspace shares
@@ -131,16 +154,23 @@ return {
       text = { enabled = true },
       xml = { enabled = true },
     },
-    config = function(_, opts)
+    config = function(plugin, opts)
+      local function start()
       require('sonarqube').setup(opts)
 
       local server = require 'sonarqube.lsp.server'
+
+      -- Shim: the plugin calls deprecated `client.notify(...)` (removed in
+      -- Nvim 0.13). Read lazily at client start, so overriding here works.
+      server.did_change_configuration = function(client)
+        local sq = client or vim.lsp.get_clients({ name = 'sonarqube' })[1]
+        if not sq then return end
+        sq:notify('workspace/didChangeConfiguration', { settings = server.settings })
+      end
       -- Connected mode needs a *user* token: project-analysis tokens only
       -- authorise the scanner API, so the server accepts them for analysis but
       -- refuses the endpoints that hand back the quality profile / rule set.
-      local token = vim.env.SONARQUBE_TOKEN_USER
-        or vim.env.SONARQUBE_TOKEN
-        or vim.env.SONARQUBE_TOKEN_PROJECT
+      local token = vim.env.SONARQUBE_TOKEN
 
       -- The server re-asks for credentials per folder/connection, so an
       -- unguarded notify here fires repeatedly and each one triggers its own
@@ -162,7 +192,7 @@ return {
         if not token or token == '' then
           warn_once(
             'missing-token',
-            'SonarQube: SONARQUBE_TOKEN_USER unset, connected mode disabled',
+            'SonarQube: SONARQUBE_TOKEN unset, connected mode disabled',
             vim.log.levels.WARN
           )
           return vim.NIL
@@ -332,6 +362,67 @@ return {
         end,
         { desc = 'Show the resolved SonarQube connected-mode binding' }
       )
+      end -- start()
+
+      -- Gate on the eltostratus VPN: without it the server can't reach
+      -- sonar.elhub.cloud, connected-mode sync fails and analysis never
+      -- publishes anything. Defer startup until the VPN is up instead.
+      -- The DNS lookup runs off the main loop so opening a buffer never
+      -- blocks on it; buffers opened meanwhile are queued and attached once
+      -- the lookup succeeds.
+      local group = vim.api.nvim_create_augroup('custom-sonarqube-vpn', { clear = true })
+      local started = false
+      local in_flight = false
+      local pending = {}
+
+      local function on_result(up)
+        in_flight = false
+        local bufs = pending
+        pending = {}
+        if started then return end
+        if up then
+          started = true
+          pcall(vim.api.nvim_del_augroup_by_id, group)
+          start()
+          -- Re-fire FileType so the plugin's own autocmd attaches the buffers.
+          for buf in pairs(bufs) do
+            if vim.api.nvim_buf_is_valid(buf) and vim.api.nvim_buf_is_loaded(buf) then
+              vim.api.nvim_exec_autocmds('FileType', { buffer = buf })
+            end
+          end
+          return
+        end
+        for buf in pairs(bufs) do
+          if vim.api.nvim_buf_is_valid(buf) and not vim.b[buf].sonarqube_vpn_warned then
+            vim.b[buf].sonarqube_vpn_warned = true
+            vim.notify(
+              'SonarQube: eltostratus OpenVPN not active (cannot resolve '
+                .. SERVER_HOST
+                .. '), skipping SonarQube',
+              vim.log.levels.WARN
+            )
+            break -- one warning per lookup is enough
+          end
+        end
+      end
+
+      local function gate(buf)
+        if started then return end
+        if buf then pending[buf] = true end
+        if in_flight then return end
+        in_flight = true
+        vpn_up(on_result)
+      end
+
+      vim.api.nvim_create_autocmd('FileType', {
+        group = group,
+        pattern = plugin.ft,
+        callback = function(args) gate(args.buf) end,
+      })
+      -- lazy.nvim re-fires FileType into augroups created during load, which
+      -- hits `gate` for the triggering buffer. Also kick off a lookup now so
+      -- loading via a command (e.g. :SonarQubeProjects) still starts it.
+      gate(nil)
     end,
   },
 }

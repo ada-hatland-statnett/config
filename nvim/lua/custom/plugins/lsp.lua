@@ -48,13 +48,16 @@ return {
       local capabilities = require('blink.cmp').get_lsp_capabilities()
       local servers = {
         pyright = {},
+        ruff = {}, -- `ruff server` (replaces the deprecated ruff-lsp)
+        sqls = {
+          -- Same connections as nvim-dbee (custom/db-connections.lua).
+          settings = { sqls = { connections = require('custom.db-connections').sqls() } },
+        },
       }
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'lua-language-server',
         'stylua',
-        'ruff-lsp',
-        'sqls',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
       for name, server in pairs(servers) do
