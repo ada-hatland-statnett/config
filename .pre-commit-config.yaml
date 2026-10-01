@@ -1,0 +1,7 @@
+# This repo is public: block commits that contain secrets.
+# Install the hook once per clone: `pre-commit install`
+repos:
+  - repo: https://github.com/betterleaks/betterleaks
+    rev: v1.9.0
+    hooks:
+      - id: betterleaks

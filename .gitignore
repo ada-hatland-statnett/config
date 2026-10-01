@@ -5,4 +5,5 @@
 !ruff
 !opencode
 !.gitignore
+!.pre-commit-config.yaml
 !starship.toml
