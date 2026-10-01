@@ -1,0 +1,16 @@
+# Connection settings
+# jira_api_token is intentionally omitted: it is read from the JIRA_API_TOKEN env var.
+jira_api_username: 'ada.hatland@statnett.no'
+jira_api_base_url: 'https://elhub.atlassian.net'
+jira_base_url: 'https://elhub.atlassian.net'
+jira_api_version: 3
+cloud: true
+
+# Pre-defined JQL
+pre_defined_jql_expressions:
+  1:
+    label: 'My open tasks'
+    expression: 'assignee = currentUser() AND status NOT IN (Done, Rejected) ORDER BY status ASC, priority DESC'
+
+# Use the expression above as the default for work item searches
+jql_expression_id_for_work_items_search: 1

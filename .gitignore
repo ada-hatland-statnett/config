@@ -1,9 +1,14 @@
 *
 !nvim
+!nvim/**
 !fish
+!fish/**
 !jiratui
+!jiratui/**
 !ruff
+!ruff/**
 !opencode
+!opencode/**
 !.gitignore
 !.pre-commit-config.yaml
 !starship.toml

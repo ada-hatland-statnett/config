@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    // Never modify the watson workspace. Last matching rule wins, so the
+    // catch-all comes first.
+    "edit": {
+      "*": "allow",
+      "~/git/watson/**": "deny",
+      "/home/ada.hatland/git/watson/**": "deny"
+    }
+  }
+}
