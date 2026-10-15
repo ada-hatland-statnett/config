@@ -81,6 +81,11 @@ vim.keymap.set(
   { silent = true, desc = 'Save session and quit Neovim' }
 )
 vim.keymap.set('n', '<leader>d', function()
+  local listed = vim.fn.getbufinfo { buflisted = 1 }
+  if #listed <= 1 then
+    vim.cmd 'confirm quitall'
+    return
+  end
   local pid = vim.b.terminal_job_pid
   if pid then
     -- Terminal buffer: only prompt if the shell has a running child process.
@@ -92,6 +97,12 @@ vim.keymap.set('n', '<leader>d', function()
     vim.cmd 'bdelete'
   end
 end, { desc = 'Buffer: delete' })
+vim.keymap.set(
+  'n',
+  '<leader>D',
+  '<cmd>confirm quitall<cr>',
+  { silent = true, desc = 'Close all buffers and quit (no session save)' }
+)
 vim.keymap.set('n', '<leader>t', function()
   -- Leave special windows (neo-tree, etc.) before opening the terminal.
   if vim.bo.buftype ~= '' then vim.cmd 'wincmd p' end

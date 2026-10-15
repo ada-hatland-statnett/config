@@ -90,7 +90,7 @@ return {
     end,
     keys = {
       {
-        '<leader>D',
+        '<leader>o',
         function() require('dbee').toggle() end,
         desc = 'Database UI toggle',
       },

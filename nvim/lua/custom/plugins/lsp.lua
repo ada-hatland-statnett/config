@@ -47,8 +47,16 @@ return {
       })
       local capabilities = require('blink.cmp').get_lsp_capabilities()
       local servers = {
-        pyright = {},
-        ruff = {}, -- `ruff server` (replaces the deprecated ruff-lsp)
+        ruff = {},
+        pyright = {
+          settings = {
+            python = {
+              analysis = {
+                typeCheckingMode = 'off',
+              },
+            },
+          },
+        },
         sqls = {
           -- Same connections as nvim-dbee (custom/db-connections.lua).
           settings = { sqls = { connections = require('custom.db-connections').sqls() } },

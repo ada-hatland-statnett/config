@@ -15,7 +15,13 @@ local function session_file()
   local root = vim.fs.root(vim.fn.getcwd(), '.git') or vim.fn.getcwd()
   local dir = vim.fn.stdpath 'state' .. '/sessions'
   vim.fn.mkdir(dir, 'p')
-  return dir .. '/' .. root:gsub('[/\\:]', '%%') .. '.vim'
+  local key = root
+  if vim.fs.root(vim.fn.getcwd(), '.git') then
+    local out = vim.system({ 'git', 'symbolic-ref', '--short', '-q', 'HEAD' }, { cwd = root, text = true }):wait()
+    local branch = vim.trim(out.stdout or '')
+    if out.code == 0 and branch ~= '' then key = root .. '@' .. branch end
+  end
+  return dir .. '/' .. key:gsub('[/\\:]', '%%') .. '.vim'
 end
 
 function _G.SaveSession()
@@ -38,6 +44,20 @@ vim.api.nvim_create_autocmd('VimEnter', {
       local file = session_file()
       if vim.fn.filereadable(file) == 1 then
         vim.cmd('silent! source ' .. vim.fn.fnameescape(file))
+        -- Drop buffers whose files no longer exist (deleted/renamed since the save)
+        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+          local name = vim.api.nvim_buf_get_name(buf)
+          if vim.bo[buf].buftype == '' and name ~= '' and not vim.uv.fs_stat(name) and not vim.bo[buf].modified then
+            for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+              if #vim.api.nvim_tabpage_list_wins(vim.api.nvim_win_get_tabpage(win)) > 1 then
+                pcall(vim.api.nvim_win_close, win, false)
+              else
+                vim.api.nvim_win_call(win, function() vim.cmd 'enew' end)
+              end
+            end
+            pcall(vim.api.nvim_buf_delete, buf, { force = true })
+          end
+        end
       else
         vim.cmd 'Neotree toggle'
       end
