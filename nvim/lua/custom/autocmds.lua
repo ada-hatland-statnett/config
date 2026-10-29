@@ -33,6 +33,33 @@ function _G.SaveSession()
   vim.cmd('silent! mksession! ' .. vim.fn.fnameescape(session_file()))
 end
 
+local active_session
+function _G.ClearSession()
+  active_session = nil
+  os.remove(session_file())
+end
+
+-- Once a session is restored, keep its buffer list in sync: opening a file
+-- adds it, deleting a buffer (e.g. `<leader>d`) removes it. Neo-tree and
+-- terminal windows are skipped by mksession given the sessionoptions above.
+local sync_pending = false
+local function sync_session()
+  if not active_session or sync_pending then return end
+  sync_pending = true
+  vim.schedule(function()
+    sync_pending = false
+    if vim.v.exiting ~= vim.NIL then return end
+    vim.cmd('silent! mksession! ' .. vim.fn.fnameescape(active_session))
+  end)
+end
+vim.api.nvim_create_autocmd({ 'BufAdd', 'BufDelete', 'BufWipeout' }, {
+  desc = 'Keep the restored session in sync with the buffer list',
+  callback = function(ev)
+    if vim.bo[ev.buf].buftype ~= '' or ev.file == '' then return end
+    sync_session()
+  end,
+})
+
 -- On startup with no file arguments, restore the repo session, else open Neo-tree
 vim.api.nvim_create_autocmd('VimEnter', {
   nested = true,
@@ -58,6 +85,8 @@ vim.api.nvim_create_autocmd('VimEnter', {
             pcall(vim.api.nvim_buf_delete, buf, { force = true })
           end
         end
+        active_session = file
+        sync_session()
       else
         vim.cmd 'Neotree toggle'
       end

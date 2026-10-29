@@ -100,8 +100,17 @@ end, { desc = 'Buffer: delete' })
 vim.keymap.set(
   'n',
   '<leader>D',
-  '<cmd>confirm quitall<cr>',
-  { silent = true, desc = 'Close all buffers and quit (no session save)' }
+  function()
+    -- Clear on actual exit, so cancelling the unsaved-changes prompt keeps the session
+    local id = vim.api.nvim_create_autocmd('VimLeavePre', {
+      once = true,
+      callback = _G.ClearSession,
+    })
+    if not pcall(vim.cmd, 'confirm quitall') then
+      pcall(vim.api.nvim_del_autocmd, id)
+    end
+  end,
+  { silent = true, desc = 'Clear saved session and quit' }
 )
 vim.keymap.set('n', '<leader>t', function()
   -- Leave special windows (neo-tree, etc.) before opening the terminal.
