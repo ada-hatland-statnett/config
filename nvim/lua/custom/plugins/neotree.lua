@@ -30,6 +30,17 @@ return {
             ['l'] = 'open',
             ['s'] = 'open_split',
             ['v'] = 'open_vsplit',
+            ['S'] = function(state)
+              local node = state.tree:get_node()
+              if not node or node.type ~= 'file' then return end
+              local bufnr = vim.fn.bufnr(node.path)
+              if bufnr == -1 or not vim.api.nvim_buf_is_loaded(bufnr) then
+                vim.notify('Not open in a buffer: ' .. node.name, vim.log.levels.INFO)
+                return
+              end
+              vim.api.nvim_buf_call(bufnr, function() vim.cmd 'silent write' end)
+              vim.notify('Saved ' .. node.name)
+            end,
             ['<space>'] = 'none',
             ['<tab>'] = 'focus_preview',
             ['e'] = 'none',
