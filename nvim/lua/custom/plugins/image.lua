@@ -3,8 +3,9 @@ return {
     '3rd/image.nvim',
     -- Uses the ImageMagick CLI (processor = 'magick_cli'), so no luarocks needed.
     build = false,
+    lazy = false,
     opts = {
-      backend = 'kitty', -- WezTerm supports the kitty graphics protocol
+      backend = 'kitty', -- Noctty (Ghostty-based) supports the kitty graphics protocol
       processor = 'magick_cli', -- use ImageMagick CLI (you have `convert`/`magick`)
       integrations = {
         markdown = {
@@ -29,5 +30,15 @@ return {
         '*.svg',
       },
     },
+    config = function(_, opts)
+      -- In WSL the terminal is a Windows program and can't read files from the
+      -- Linux filesystem, so send image data inline instead of as a file path.
+      if vim.fn.has 'wsl' == 1 then
+        -- image.nvim requires this module with slashes; a dotted path would load a separate copy.
+        local medium = require('image/backends/kitty/codes').control.transmit_medium
+        medium.file = medium.direct
+      end
+      require('image').setup(opts)
+    end,
   },
 }

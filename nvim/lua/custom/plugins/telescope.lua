@@ -16,7 +16,46 @@ return {
       { 'nvim-tree/nvim-web-devicons', enabled = vim.g.have_nerd_font },
     },
     config = function()
+      local previewers = require 'telescope.previewers'
+      local image_exts = { png = true, jpg = true, jpeg = true, gif = true, webp = true, avif = true, svg = true }
+      local preview_image
+
+      local function clear_preview_image()
+        if preview_image then
+          preview_image:clear()
+          preview_image = nil
+        end
+      end
+
+      local function buffer_previewer_maker(filepath, bufnr, opts)
+        clear_preview_image()
+        local ext = vim.fn.fnamemodify(filepath, ':e'):lower()
+        local ok, image = pcall(require, 'image')
+        if not (image_exts[ext] and ok) then return previewers.buffer_previewer_maker(filepath, bufnr, opts) end
+
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
+        local winid = opts.winid
+        vim.schedule(function()
+          if not (vim.api.nvim_win_is_valid(winid) and vim.api.nvim_win_get_buf(winid) == bufnr) then return end
+          preview_image = image.from_file(filepath, { window = winid, buffer = bufnr, x = 0, y = 0, with_virtual_padding = true })
+          if preview_image then preview_image:render() end
+        end)
+      end
+
+      -- Remove the preview image once the Telescope picker closes.
+      vim.api.nvim_create_autocmd('WinClosed', {
+        group = vim.api.nvim_create_augroup('telescope-image-preview', { clear = true }),
+        callback = function()
+          vim.schedule(function()
+            if preview_image and not vim.api.nvim_win_is_valid(preview_image.window) then clear_preview_image() end
+          end)
+        end,
+      })
+
       require('telescope').setup {
+        defaults = {
+          buffer_previewer_maker = buffer_previewer_maker,
+        },
         extensions = {
           ['ui-select'] = { require('telescope.themes').get_dropdown() },
           defaults = {
