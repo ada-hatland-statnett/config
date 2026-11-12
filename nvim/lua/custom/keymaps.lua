@@ -125,6 +125,7 @@ vim.keymap.set('n', 'U', '<C-r>', { noremap = true, silent = true })
 -- Make `c` (change) not touch the clipboard/registers (send to black hole)
 vim.keymap.set({ 'n', 'x' }, 'c', '"_c', { noremap = true, silent = true })
 vim.keymap.set({ 'n', 'x' }, 'C', '"_C', { noremap = true, silent = true })
+vim.keymap.set({ 'n', 'x' }, 'x', '"_x', { noremap = true, silent = true })
 
 -- Telescope live grep (opens file at matched line)
 vim.keymap.set('n', '<leader>sg', function()

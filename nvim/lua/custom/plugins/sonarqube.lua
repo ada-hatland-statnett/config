@@ -48,6 +48,14 @@ end
 local INSIGHT_KEY = 'no.elhub.insight.analytics-insight'
 local WATSON_DIR = vim.fs.normalize '~/git/watson'
 
+-- Compare with a trailing slash so a sibling like `watson-toolbox` sitting
+-- next to `watson/` can't match on the prefix alone.
+local function in_watson(path)
+  local normalised = vim.fs.normalize(path)
+  return normalised == WATSON_DIR
+    or vim.startswith(normalised, WATSON_DIR .. '/')
+end
+
 local function git_root()
   local dir = vim.fs.dirname(
     vim.fs.find('.git', { upward = true, path = vim.fn.getcwd() })[1]
@@ -78,15 +86,7 @@ local function resolve_project_key(root)
   end
 
   -- 3. Anything inside the watson workspace binds to the insight project.
-  -- Compare with a trailing slash so a sibling like `watson-toolbox` sitting
-  -- next to `watson/` can't match on the prefix alone.
-  local normalised = vim.fs.normalize(root)
-  if
-    normalised == WATSON_DIR
-    or vim.startswith(normalised, WATSON_DIR .. '/')
-  then
-    return INSIGHT_KEY
-  end
+  if in_watson(root) then return INSIGHT_KEY end
 
   return nil
 end
@@ -94,6 +94,8 @@ end
 return {
   {
     'iamkarasik/sonarqube.nvim',
+    -- Only used for the watson workspace; disabled everywhere else.
+    cond = function() return in_watson(vim.fn.getcwd()) end,
     -- Must match the filetypes the enabled analyzers register below; the
     -- plugin attaches via a FileType autocmd, so it has to be loaded by then.
     ft = {
@@ -220,11 +222,14 @@ return {
           if not params or not params.uri then return end
           local bufnr = vim.uri_to_bufnr(params.uri)
           if not vim.api.nvim_buf_is_loaded(bufnr) then return end
-          vim.diagnostic.set(
-            ns,
-            bufnr,
-            vim.lsp.diagnostic.from(params.diagnostics or {})
-          )
+          -- Hotspots ignore NOSONAR (and sonar-iac doesn't honour it in YAML),
+          -- so drop anything whose start line carries the marker.
+          local diags = vim.tbl_filter(function(d)
+            local lnum = d.range and d.range.start.line or 0
+            local line = vim.api.nvim_buf_get_lines(bufnr, lnum, lnum + 1, false)[1]
+            return not (line and line:find('NOSONAR', 1, true))
+          end, params.diagnostics or {})
+          vim.diagnostic.set(ns, bufnr, vim.lsp.diagnostic.from(diags))
         end
       end
       server.register_handler(

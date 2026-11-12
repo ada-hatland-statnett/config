@@ -3,7 +3,7 @@ status is-interactive; or exit
 fish_default_key_bindings
 
 if status is-interactive
-    set -gx SSH_AUTH_SOCK (bash -c 'eval "$(SHELL=/bin/sh keychain --eval --quiet "$HOME/.ssh/id_ed25519")"; printf "%s" "$SSH_AUTH_SOCK"')
+    set -gx SSH_AUTH_SOCK (bash -c 'eval "$(SHELL=/bin/sh keychain --eval --quiet "$HOME/.ssh/github")"; printf "%s" "$SSH_AUTH_SOCK"')
     set -g fish_greeting "🐟🐟🐟bem-vinda🐟🐟🐟"
 end
 
