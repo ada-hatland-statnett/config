@@ -173,10 +173,14 @@ vim.api.nvim_create_autocmd('FileType', {
   end,
 })
 
--- SQL indentation: 2 spaces per tab/indent level
+-- Always indent with 4 spaces, except Makefiles which require real tabs
 vim.api.nvim_create_autocmd('FileType', {
-  pattern = 'sql',
-  callback = function()
+  pattern = '*',
+  callback = function(args)
+    if args.match == 'make' then
+      vim.opt_local.expandtab = false
+      return
+    end
     vim.opt_local.expandtab = true
     vim.opt_local.tabstop = 4
     vim.opt_local.shiftwidth = 4
