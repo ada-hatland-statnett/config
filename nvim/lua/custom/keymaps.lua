@@ -122,6 +122,11 @@ vim.keymap.set('n', '<leader>t', function()
 end, { desc = 'Open terminal' })
 vim.keymap.set('n', 'U', '<C-r>', { noremap = true, silent = true })
 
+-- Paste from the system clipboard
+vim.keymap.set('n', '<C-v>', '"+p', { desc = 'Paste from clipboard' })
+vim.keymap.set('x', '<C-v>', '"+P', { desc = 'Paste from clipboard' })
+vim.keymap.set('i', '<C-v>', '<C-r><C-o>+', { desc = 'Paste from clipboard' })
+
 -- Make `c` (change) not touch the clipboard/registers (send to black hole)
 vim.keymap.set({ 'n', 'x' }, 'c', '"_c', { noremap = true, silent = true })
 vim.keymap.set({ 'n', 'x' }, 'C', '"_C', { noremap = true, silent = true })
@@ -132,7 +137,7 @@ vim.keymap.set('n', '<leader>sg', function()
   local actions = require 'telescope.actions'
   local action_state = require 'telescope.actions.state'
   require('telescope').extensions.live_grep_args.live_grep_args {
-    additional_args = function() return { '--hidden', '--glob', '!**/.*/**' } end,
+    additional_args = function() return { '--hidden', '--no-ignore', '--glob', '*', '--glob', '!**/.*/**', '--glob', '**/.github/**', '--glob', '**/.teamcity/**' } end,
     attach_mappings = function(prompt_bufnr)
       actions.select_default:replace(function()
         local entry = action_state.get_selected_entry()

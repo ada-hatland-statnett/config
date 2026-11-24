@@ -83,7 +83,7 @@ return {
       vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps' })
       vim.keymap.set('n', '<leader>sf', function()
         builtin.find_files {
-          find_command = { 'rg', '--files', '--hidden', '--glob', '!**/.*/**' },
+          find_command = { 'rg', '--files', '--hidden', '--no-ignore', '--glob', '*', '--glob', '!**/.*/**', '--glob', '**/.github/**', '--glob', '**/.teamcity/**' },
         }
       end, { desc = '[S]earch [F]iles' })
       vim.keymap.set('n', '<leader>ss', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
@@ -102,7 +102,9 @@ return {
           -- `grd` is owned by the dbee table preview in SQL buffers, which maps
           -- it buffer-locally on FileType. LspAttach fires afterwards, so just
           -- leave that mapping alone here (deleting it would remove dbee's).
-          if vim.bo[buf].filetype ~= 'sql' then
+          if vim.api.nvim_buf_get_name(buf):match('/%.teamcity/settings%.kts$') then
+            require('custom.kotlin-imports').attach(buf, builtin.lsp_definitions)
+          elseif vim.bo[buf].filetype ~= 'sql' then
             vim.keymap.set('n', 'grd', builtin.lsp_definitions, { buffer = buf, desc = '[G]oto [D]efinition' })
           end
           vim.keymap.set('n', 'gO', builtin.lsp_document_symbols, { buffer = buf, desc = 'Open Document Symbols' })

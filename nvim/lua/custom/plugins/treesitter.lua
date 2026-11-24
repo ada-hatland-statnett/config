@@ -3,7 +3,7 @@ return {
   {
     'nvim-treesitter/nvim-treesitter',
     config = function()
-      local filetypes = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'sql', 'python' }
+      local filetypes = { 'bash', 'c', 'diff', 'html', 'kotlin', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'sql', 'python' }
       -- nvim-treesitter `main` ignores ensure_installed/highlight options;
       -- parsers must be installed explicitly (no-op if already present).
       require('nvim-treesitter').setup {}

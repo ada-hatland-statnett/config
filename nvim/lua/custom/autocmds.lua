@@ -9,19 +9,45 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 })
 
 -- Per-repo sessions: saved by `M` (see keymaps), restored on bare `nvim`
-vim.opt.sessionoptions = 'buffers,curdir,folds,tabpages,winsize'
+-- No 'curdir': the cwd nvim was started from always wins over the saved one
+vim.opt.sessionoptions = 'buffers,folds,tabpages,winsize'
+local startup_cwd = vim.fn.getcwd()
 
 local function session_file()
-  local root = vim.fs.root(vim.fn.getcwd(), '.git') or vim.fn.getcwd()
+  local root = vim.fs.root(startup_cwd, '.git') or startup_cwd
   local dir = vim.fn.stdpath 'state' .. '/sessions'
   vim.fn.mkdir(dir, 'p')
   local key = root
-  if vim.fs.root(vim.fn.getcwd(), '.git') then
+  if vim.fs.root(startup_cwd, '.git') then
     local out = vim.system({ 'git', 'symbolic-ref', '--short', '-q', 'HEAD' }, { cwd = root, text = true }):wait()
     local branch = vim.trim(out.stdout or '')
     if out.code == 0 and branch ~= '' then key = root .. '@' .. branch end
   end
   return dir .. '/' .. key:gsub('[/\\:]', '%%') .. '.vim'
+end
+
+-- mksession, then strip files outside the startup directory from the result
+local function write_session(path)
+  vim.cmd('silent! mksession! ' .. vim.fn.fnameescape(path))
+  local prefix = vim.fs.normalize(startup_cwd) .. '/'
+  local function outside(raw)
+    local name = vim.fs.normalize(vim.fn.fnamemodify(raw:gsub('\\(.)', '%1'), ':p'))
+    return name:sub(1, #prefix) ~= prefix
+  end
+  local ok, lines = pcall(vim.fn.readfile, path)
+  if not ok then return end
+  local out = {}
+  for _, line in ipairs(lines) do
+    local cmd, file = line:match '^(%$?%a+) +(.+)$'
+    if cmd == 'badd' then file = file:match '^%+%d+ (.+)$' end
+    local listed = cmd == 'badd' or cmd == 'balt' or cmd == 'argadd' or cmd == '$argadd' or cmd == 'edit'
+    if listed and file and outside(file) then
+      if cmd == 'edit' then table.insert(out, 'enew') end
+    else
+      table.insert(out, line)
+    end
+  end
+  vim.fn.writefile(out, path)
 end
 
 function _G.SaveSession()
@@ -30,7 +56,18 @@ function _G.SaveSession()
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.bo[buf].buftype ~= '' then pcall(vim.api.nvim_buf_delete, buf, { force = true }) end
   end
-  vim.cmd('silent! mksession! ' .. vim.fn.fnameescape(session_file()))
+  -- Drop empty buffers (unnamed or with all content removed) and files outside the startup directory
+  local prefix = vim.fs.normalize(startup_cwd) .. '/'
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buflisted then
+      local name = vim.api.nvim_buf_get_name(buf)
+      local lines = vim.api.nvim_buf_is_loaded(buf) and vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+      local empty = name == '' or (lines and #lines == 1 and lines[1] == '')
+      local outside = name ~= '' and vim.fs.normalize(name):sub(1, #prefix) ~= prefix
+      if empty or outside then pcall(vim.api.nvim_buf_delete, buf, { force = true }) end
+    end
+  end
+  write_session(session_file())
 end
 
 local active_session
@@ -49,7 +86,7 @@ local function sync_session()
   vim.schedule(function()
     sync_pending = false
     if vim.v.exiting ~= vim.NIL then return end
-    vim.cmd('silent! mksession! ' .. vim.fn.fnameescape(active_session))
+    write_session(active_session)
   end)
 end
 vim.api.nvim_create_autocmd({ 'BufAdd', 'BufDelete', 'BufWipeout' }, {
@@ -88,8 +125,10 @@ vim.api.nvim_create_autocmd('VimEnter', {
         active_session = file
         sync_session()
       else
-        vim.cmd 'Neotree toggle'
+        vim.cmd('Neotree show dir=' .. vim.fn.fnameescape(startup_cwd))
       end
+      -- Neo-tree's root always starts at the directory nvim was opened from
+      if vim.fn.getcwd() ~= startup_cwd then vim.cmd.cd(vim.fn.fnameescape(startup_cwd)) end
     end
   end),
 })

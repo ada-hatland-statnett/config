@@ -19,6 +19,13 @@
 
 # Tooling
 
+- Never edit `pyproject.toml` by hand (including version bumps). Changes
+  should happen in CI or through `uv` commands (e.g. `uv add`,
+  `uv remove`, `uv version --bump`).
+
+- Always load the `python-unit-tests` skill when writing, planning, or
+  reviewing Python unit tests.
+
 - Load the `file-search` skill before any non-trivial codebase search
   (multi-pattern, large trees, structural/AST queries, PDFs/archives,
   code stats). Its tools (`rg`, `fd`, `sg`, `semgrep`, `rga`, `tokei`,

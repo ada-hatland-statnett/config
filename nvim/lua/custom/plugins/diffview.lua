@@ -55,6 +55,48 @@ return {
         end)
       end
 
+      -- Make the right side of the diff match the left side for the file
+      -- under the cursor, e.g. deletes a file that doesn't exist on the left.
+      local function git_restore_to_left()
+        local RevType = require('diffview.vcs.rev').RevType
+        local view = require('diffview.lib').get_current_view()
+        if not (view and view.panel) then return end
+        local item = view.panel:get_item_at_cursor()
+        if not (item and item.path and item.revs) then
+          vim.notify('No file under cursor', vim.log.levels.WARN)
+          return
+        end
+        local left, right = item.revs.a, item.revs.b
+        if vim.fn.confirm('Restore ' .. item.path .. ' to the left side?', '&Yes\n&No', 2) ~= 1 then return end
+
+        local root = view.adapter.ctx.toplevel
+        if item.status == '?' then
+          vim.fn.delete(root .. '/' .. item.path)
+          view:update_files()
+          return
+        end
+
+        local cmd = { 'restore' }
+        if left.type == RevType.COMMIT then
+          table.insert(cmd, '--source=' .. left:object_name())
+          table.insert(cmd, '--staged')
+          if right.type == RevType.LOCAL then table.insert(cmd, '--worktree') end
+        elseif right.type ~= RevType.LOCAL then
+          vim.notify('Unsupported diff sides for restore', vim.log.levels.WARN)
+          return
+        end
+        table.insert(cmd, '--')
+        table.insert(cmd, item.path)
+        if item.oldpath and item.oldpath ~= item.path then table.insert(cmd, item.oldpath) end
+
+        local out = vim.fn.system(vim.list_extend({ 'git', '-C', root }, cmd))
+        if vim.v.shell_error ~= 0 then
+          vim.notify(out, vim.log.levels.ERROR)
+          return
+        end
+        view:update_files()
+      end
+
       require('diffview').setup {
         keymaps = {
           view = {
@@ -69,6 +111,7 @@ return {
             { 'n', 'o', open_file_under_cursor, { desc = 'Close Diffview and open file in buffer' } },
             { 'n', 'a', git_add, { desc = 'git add file under cursor' } },
             { 'n', 'r', git_restore, { desc = 'git restore file under cursor (unstaged only)' } },
+            { 'n', 'R', git_restore_to_left, { desc = 'Restore file under cursor to the left side' } },
             { 'n', '<esc>', '<cmd>DiffviewClose<cr>', { desc = 'Close Diffview' } },
           },
         },

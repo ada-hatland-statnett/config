@@ -1,0 +1,3 @@
+interface:
+  display_name: "Python Unit Tests"
+  short_description: "Plan first, then write concise isolated tests from a Git diff."

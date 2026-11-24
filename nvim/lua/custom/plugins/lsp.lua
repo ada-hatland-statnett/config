@@ -47,6 +47,7 @@ return {
       })
       local capabilities = require('blink.cmp').get_lsp_capabilities()
       local servers = {
+        kotlin_lsp = {},
         ruff = {},
         pyright = {
           settings = {
@@ -62,7 +63,8 @@ return {
           settings = { sqls = { connections = require('custom.db-connections').sqls() } },
         },
       }
-      local ensure_installed = vim.tbl_keys(servers or {})
+      local mason_names = { kotlin_lsp = 'kotlin-lsp' }
+      local ensure_installed = vim.tbl_map(function(name) return mason_names[name] or name end, vim.tbl_keys(servers))
       vim.list_extend(ensure_installed, {
         'lua-language-server',
         'stylua',
