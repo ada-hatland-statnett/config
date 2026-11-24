@@ -66,6 +66,7 @@ return {
       local mason_names = { kotlin_lsp = 'kotlin-lsp' }
       local ensure_installed = vim.tbl_map(function(name) return mason_names[name] or name end, vim.tbl_keys(servers))
       vim.list_extend(ensure_installed, {
+        'ktlint',
         'lua-language-server',
         'stylua',
       })
